@@ -8,6 +8,110 @@ window.Pages = (function () {
   const fnOf = function (o) { for (let i = 1; i < arguments.length; i++) { if (o && typeof o[arguments[i]] === 'function') return o[arguments[i]]; } for (const k in o) if (typeof o[k] === 'function') return o[k]; return null; };
   const A = function () { return window.App; };
 
+
+  /* ---------- Reference-layout building blocks ---------- */
+  const TONE_WORD = { good: 'On track', warn: 'At risk', bad: 'Needs attention', '': 'No data' };
+  const MAP_TONE = { procPct: function (v) { return tone(v.procPct, 0.95, 0.8); }, pay24: function (v) { return tone(v.pay24, 0.9, 0.8); }, cmrPct: function (v) { return tone(v.cmrPct, 0.6, 0.45); }, util: function (v) { return v.cap ? tone(v.util, 0.85, 0.93, false) : ''; }, s2Pct: function (v) { return tone(v.s2Pct, 0.85, 0.7); }, alerts: function (v) { return tone(v.p1, 0, 2, false); }, prep: function (v) { return v.prepNA ? '' : tone(v.prep, 0.7, 0.5); } };
+  const MAP_VAL = { procPct: function (v) { return v.procPct; }, pay24: function (v) { return v.pay24; }, cmrPct: function (v) { return v.cmrPct; }, util: function (v) { return v.cap ? v.util : null; }, s2Pct: function (v) { return v.s2Pct; }, alerts: function (v) { return v.alerts; }, prep: function (v) { return v.prepNA ? null : v.prep; } };
+  const MAP_FMT = { alerts: function (x) { return fmtN(x); } };
+  const ABBR = {}; D.forEach(function (d) { ABBR[d.name] = d.abbr; });
+  const scopeVals = function () { const dn = (E.L.state.path || [])[0]; return dn ? distVals(dn) : stateVals(); };
+  // Overall district health: how many of the 9 overview measures sit below threshold.
+  const MEASURES = [['Procurement vs target', function (v) { return tone(v.procPct, 0.95, 0.8); }], ['Farmers paid within 24 h', function (v) { return tone(v.pay24, 0.9, 0.8); }], ['CMR delivered', function (v) { return tone(v.cmrPct, 0.6, 0.45); }], ['Stage-I moved', function (v) { return tone(v.s1Pct, 0.9, 0.8); }], ['Stage-II to FPS', function (v) { return tone(v.s2Pct, 0.85, 0.7); }], ['Godown utilisation', function (v) { return v.cap ? tone(v.util, 0.85, 0.93, false) : ''; }], ['Critical incidents', function (v) { return tone(v.p1, 0, 2, false); }], ['GPS route deviations', function (v) { return tone(v.vehDev / (v.veh || 1), 0.02, 0.04, false); }], ['CCTV online', function (v) { return v.cams ? tone(v.camOnline, 0.95, 0.9) : ''; }]];
+  const health = function (v) { const bad = [], warn = []; MEASURES.forEach(function (m) { const t = m[1](v); if (t === 'bad') bad.push(m[0]); else if (t === 'warn') warn.push(m[0]); }); const status = bad.length >= 4 ? 'bad' : (bad.length || warn.length >= 3) ? 'warn' : 'good'; return { bad: bad, warn: warn, status: status, score: Math.round((MEASURES.length - bad.length - warn.length * 0.5) / MEASURES.length * 100) }; };
+  const districtHealth = function () { return D.map(function (d) { const v = distVals(d.name); const h = health(v); return { name: d.name, v: v, h: h }; }); };
+  const openDecisionsFor = function (dn) { return (E.L.state.actLog || []).filter(function (e) { return e.dn === dn && e.status !== 'Done'; }); };
+  const actionStatus = function (dn) { const l = openDecisionsFor(dn); if (!l.length) return ['Monitoring', '']; const e = l[0]; return [/Escalated/.test(e.decision) ? 'Intervention in progress' : 'Action initiated', e.decision]; };
+
+  // Six value-chain stage tiles in the physical order of the chain.
+  const chainTiles = function (v, inDistrict) {
+    const pool = E.L.kpiPool(v);
+    const T = [
+      { n: '1', t: 'Procurement', s: 'Farmers & RSKs', ico: 'sprout', head: fmtMT(v.procured) + ' / ' + fmtMT(v.target), sub: pct(v.procPct) + ' of target', tone: tone(v.procPct, 0.95, 0.8), rows: [['Active centres', fmtN(v.ppcAct), ''], ['Farmers registered', fmtN(v.regFarm), ''], ['Pending payments', fmtCr(v.pending), tone(v.pending / (v.valueCr || 1), 0.001, 0.01, false)]], go: 'proc' },
+      { n: '2', t: 'Processing', s: 'Mills & conversion', ico: 'mill', head: fmtMT(v.cmrDel) + ' / ' + fmtMT(v.cmrDue), sub: pct(v.cmrPct) + ' of CMR due', tone: tone(v.cmrPct, 0.6, 0.45), rows: [['Active mills', fmtN(v.millsAct), ''], ['CMR pending', fmtMT(v.cmrShort), tone(v.cmrPct, 0.6, 0.45)], ['Mill anomalies', fmtN(v.millAnom), tone(v.millAnom, 2, 8, false)]], go: 'cmr' },
+      { n: '3', t: 'Storage', s: 'Godowns & stocks', ico: 'warehouse', head: fmtMT(v.stock), sub: pct(v.util) + ' of capacity', tone: v.cap ? tone(v.util, 0.85, 0.93, false) : '', rows: [['Total capacity', fmtMT(v.cap), ''], ['Aged > 6 months', pct(v.aged / (v.stock || 1)), tone(v.aged / (v.stock || 1), 0.08, 0.14, false)], ['CCTV online', pct(v.camOnline), v.cams ? tone(v.camOnline, 0.95, 0.9) : '']], go: 'stor' },
+      { n: '4', t: 'Transportation', s: 'Movement & delivery', ico: 'truck', head: fmtMT(v.s1Moved), sub: pct(v.s1Pct) + ' of Stage-I plan', tone: tone(v.s1Pct, 0.9, 0.8), rows: [['Trip completion', pct(v.tripPct), tone(v.tripPct, 0.6, 0.4)], ['GPS exceptions', fmtN(v.vehDev), tone(v.vehDev / (v.veh || 1), 0.02, 0.04, false)], ['In transit', fmtN(v.transit) + ' trucks', '']], go: 's1' },
+      { n: '5', t: 'Distribution', s: 'FPS allocation & lifting', ico: 'shop', head: fmtMT(v.s2Fps), sub: pct(v.s2Pct) + ' of allotment', tone: tone(v.s2Pct, 0.85, 0.7), rows: [['Lifted from MLS', fmtMT(v.s2Lift), ''], ['Inspections pending', fmtN(v.insp), tone(v.insp, 5, 20, false)], ['Fair price shops', fmtN(v.fps), '']], go: 's2' },
+      { n: '6', t: 'Beneficiary service', s: 'Entitlement & grievances', ico: 'family', head: fmtN(v.cards / 100000, 1) + ' lakh', sub: 'ration cards · ' + pct(v.distPct) + ' distributed', tone: tone(v.distPct, 0.9, 0.8), rows: [['Open grievances', fmtN(v.grvOpen), tone(v.grvOpen, 10, 30, false)], ['Critical incidents', fmtN(v.p1), tone(v.p1, 0, 2, false)], ['FPS stock-out days', fmtN(v.stockout), tone(v.stockout, 5, 15, false)]], go: 's2' }
+    ];
+    return '<div class="ctiles">' + T.map(function (x) {
+      return '<button class="ctile"' + on(function () { A().go('chain', x.go); }) + '><div class="cth">' + icon(x.ico, 'cic') + '<div><div class="ctt">' + x.n + '. ' + esc(x.t) + '</div><div class="cts">' + esc(x.s) + '</div></div><span class="dot ' + x.tone + '" title="' + TONE_WORD[x.tone] + '"></span></div>' +
+        '<div class="ctv ' + x.tone + '">' + esc(x.head) + '</div><div class="ctl">' + esc(x.sub) + '</div>' +
+        '<div class="ctr">' + x.rows.map(function (r) { return '<div><span>' + esc(r[0]) + '</span><b class="' + (r[2] || '') + '">' + esc(r[1]) + '</b></div>'; }).join('') + '</div></button>';
+    }).join('') + '</div>';
+  };
+  const statusLegend = function () { return '<div class="slegend"><span><i class="dot good"></i>On track</span><span><i class="dot warn"></i>At risk</span><span><i class="dot bad"></i>Needs attention</span></div>'; };
+  // Status map coloured by the KPI threshold of the selected metric.
+  const statusMap = function (vm, opts) {
+    opts = opts || {}; const m = vm.map; const f = MAP_TONE[m.metric] || MAP_TONE.procPct; const COL = { good: '#2e7d32', warn: '#d39a22', bad: '#c0392b', '': '#cfd8d0' };
+    const tiles = m.tiles.map(function (t) { const tn = f(distVals(t.name)) || ''; return '<path d="' + t.d + '" fill="' + COL[tn] + '" class="dist' + (t.sel ? ' sel' : '') + '"' + on(t.pick) + '><title>' + esc(t.name + ' · ' + t.val + ' · ' + TONE_WORD[tn]) + '</title></path>'; }).join('');
+    const labels = opts.labels === false ? '' : m.tiles.map(function (t) { return '<text x="' + t.lx + '%" y="' + t.ly + '%" class="mlab2">' + esc(ABBR[t.name] || t.name) + '</text>'; }).join('');
+    return '<div class="mapwrap' + (opts.small ? ' small' : '') + '"><svg viewBox="0 0 800 820" class="apmap" preserveAspectRatio="xMidYMid meet">' + tiles + labels + '</svg></div>';
+  };
+  const rankList = function (list, metric, top, n) {
+    const val = MAP_VAL[metric] || MAP_VAL.procPct; const tn = MAP_TONE[metric] || MAP_TONE.procPct; const fmt = MAP_FMT[metric] || pct; const lowerBetter = metric === 'alerts' || metric === 'util';
+    const rows = list.filter(function (x) { return val(x.v) !== null; }).sort(function (a, b) { return (val(b.v) - val(a.v)) * (lowerBetter ? -1 : 1) * (top ? 1 : -1); }).slice(0, n || 5);
+    const max = Math.max.apply(null, rows.map(function (x) { return Math.abs(val(x.v)); }).concat([1e-9]));
+    return '<div class="bars">' + rows.map(function (x, i) { const t = tn(x.v); const w = metric === 'alerts' ? val(x.v) / max * 100 : val(x.v) * 100; return '<div class="brow"' + on(function () { A().openDistrict(x.name); }) + '><span class="bl"><span class="rk">' + (top ? i + 1 : list.length - i) + '</span>' + esc(x.name) + '</span><span class="bb"><i class="' + t + '" style="width:' + Math.max(2, Math.min(100, Math.round(w))) + '%"></i></span><span class="bv">' + esc(fmt(val(x.v))) + '</span></div>'; }).join('') + '</div>';
+  };
+  // District performance panel: status counts, status map, top and bottom districts on the selected metric.
+  const districtPerformance = function (vm, opts) {
+    opts = opts || {}; const m = vm.map; const dh = districtHealth(); const f = MAP_TONE[m.metric] || MAP_TONE.procPct;
+    const cnt = { good: 0, warn: 0, bad: 0, '': 0 }; dh.forEach(function (x) { cnt[f(x.v) || '']++; });
+    const counts = '<div class="scount"><span><i class="dot good"></i>On track (' + cnt.good + ')</span><span><i class="dot warn"></i>At risk (' + cnt.warn + ')</span><span><i class="dot bad"></i>Needs attention (' + cnt.bad + ')</span>' + (cnt[''] ? '<span><i class="dot"></i>No data (' + cnt[''] + ')</span>' : '') + '</div>';
+    const tabs = U.chips(m.metrics.map(function (x) { return { label: x.label, cls: x.v === m.metric ? 'on' : '', pick: function () { m.onMetric({ target: { value: x.v } }); } }; }), 'mtabs');
+    return card(sh('District performance', '', U.btn('View all districts →', function () { A().go('districts'); }, 'xs ghost')) + tabs + counts +
+      '<div class="dpgrid"><div>' + statusMap(vm, { labels: false }) + '</div><div><div class="small" style="font-weight:700;margin-bottom:6px">Top districts <span class="muted" style="font-weight:400">· ' + esc(m.metricLabel) + '</span></div>' + rankList(dh, m.metric, true, 5) + '<div class="small" style="font-weight:700;margin:12px 0 6px">Bottom districts</div>' + rankList(dh, m.metric, false, 5) + '</div></div>', opts.cls);
+  };
+  // Key alerts: the baseline's exception list, one line each, time-stamped where the record has an age.
+  const keyAlerts = function (p, opts) {
+    opts = opts || {}; const items = (p.rp && p.rp.items) || []; const feed = (p.feed || []);
+    const lines = items.slice(0, opts.n || 4).map(function (it) { return '<div class="kal"' + on(it.go) + '><span class="ai ' + U.toneOf(it.dot) + '"></span><div><div class="at">' + esc(it.text) + '</div><div class="am">' + esc(it.meta) + '</div></div></div>'; })
+      .concat(feed.slice(0, opts.feedN === undefined ? 3 : opts.feedN).map(function (f) { return '<div class="kal"' + on(f.go) + '><span class="ai ' + (f.prio === 'Critical' ? 'bad' : 'warn') + '"></span><div><div class="at">' + esc(f.title) + '</div><div class="am">' + esc(f.meta) + '</div></div></div>'; }));
+    return card(sh('Critical alerts & interventions', '', U.btn('View all →', function () { A().go('incidents'); }, 'xs ghost')) + '<div class="kals">' + (lines.join('') || U.empty('No exceptions right now.')) + '</div>' + (p.queue ? '<div style="margin-top:10px">' + U.btn('Open the incident queue', function () { A().go('incidents'); }, 'sm') + '</div>' : ''), opts.cls);
+  };
+  // Trend panel: the baseline's season chart when a season lens is on, else the preparedness forecast and ranked bars.
+  const trendPanel = function (p, vm) {
+    const sc = p.sChart && p.sChart.has ? p.sChart : null;
+    const pr = (p.prio || [])[0];
+    const body = sc ? '<div class="small" style="font-weight:700">' + esc(sc.title.split(' · ')[0]) + '</div>' + U.lineChart(sc) :
+      (pr ? '<div class="small" style="font-weight:700;margin-bottom:6px">' + esc(pr.title) + '</div>' + U.bars(pr.bars.slice(0, 6)) + '<p class="note">' + esc(pr.src) + '</p>' : '');
+    const more = (p.prio || []).slice(sc ? 0 : 1).map(function (x) { return { label: x.title.split(' — ')[0], pick: x.go }; });
+    return card(sh('Key trends', '', '') + body + (more.length ? '<div class="chips" style="margin-top:10px">' + more.map(function (c) { return '<button class="chip"' + on(c.pick) + '>' + esc(c.label) + ' →</button>'; }).join('') + '</div>' : ''));
+  };
+  const stripCard = function (title, items, goLabel, goFn, opts) {
+    opts = opts || {};
+    return card(sh(title, '', U.btn(goLabel, goFn, 'xs ghost')) + '<div class="sstrip">' + items.map(function (k) { return '<div class="si"' + (k.info ? on(k.info) : '') + ' title="' + esc(k.sub || '') + '"><div class="v ' + U.toneOf(k.vcls) + '">' + esc(k.value) + '</div><div class="l">' + esc(k.label) + '</div><div class="l2">' + esc(k.sub || '') + '</div></div>'; }).join('') + '</div>', opts.cls);
+  };
+  // Clean "districts needing attention" rendering: name, status, measures below threshold as chips, action status.
+  const attentionTable = function (list, lvl) {
+    const rows = list.filter(function (x) { return x.h.bad.length || x.h.warn.length >= 3; }).sort(function (a, b) { return b.h.bad.length - a.h.bad.length || b.h.warn.length - a.h.warn.length; });
+    if (!rows.length) return U.empty('No ' + lvl.toLowerCase() + ' is below threshold on any measure.');
+    const chipsOf = function (h) { const bad = h.bad.slice(0, 3).map(function (b) { return '<span class="mchip bad">' + esc(b) + '</span>'; }); const rest = h.bad.length > 3 ? ['<span class="mchip">+' + (h.bad.length - 3) + ' more</span>'] : h.warn.slice(0, 3 - h.bad.length).map(function (b) { return '<span class="mchip warn">' + esc(b) + '</span>'; }); return bad.concat(rest).join(''); };
+    return '<div class="tw"><table class="dt compact at"><thead><tr><th class="first">' + esc(lvl) + '</th><th class="txt">Status</th><th class="txt">Below threshold</th><th class="txt">Action status</th></tr></thead><tbody>' + rows.map(function (x) { const a = actionStatus(x.name); return '<tr><td class="first drill"' + on(function () { A().openDistrict(x.name); }) + '>' + esc(x.name) + '</td><td class="txt"><span class="status ' + x.h.status + '">' + U.dot(x.h.status) + TONE_WORD[x.h.status] + '</span></td><td class="txt"><div class="small" style="font-weight:600">' + x.h.bad.length + ' of ' + MEASURES.length + ' measures</div><span class="mchips">' + chipsOf(x.h) + '</span></td><td class="txt"><span class="astat ' + (a[0] === 'Monitoring' ? '' : 'on') + '">' + esc(a[0]) + '</span></td></tr>'; }).join('') + '</tbody></table></div>';
+  };
+    const weakestTable = function (ov) {
+    if (!ov || !ov.weak) return '';
+    return '<div class="tw"><table class="dt compact"><thead><tr><th class="first">Measure</th><th class="txt">Lowest district</th><th class="r">Value</th></tr></thead><tbody>' + ov.weak.map(function (w) { return '<tr><td class="first">' + esc(w.label) + '</td><td class="txt drill"' + on(w.go) + '>' + esc(w.name) + '</td><td class="r ' + U.toneOf(w.cls) + '"><b>' + esc(w.v) + '</b></td></tr>'; }).join('') + '</tbody></table></div>';
+  };
+  const pendFlow = function (ov) {
+    if (!ov || !ov.pend) return '';
+    return '<div class="pflow">' + ov.pend.map(function (p) { return '<div class="pf"' + on(p.go) + ' title="' + esc(p.tip) + '"><div class="pfh"><b>' + esc(p.stage) + '</b><span>' + esc(p.label) + '</span></div><div class="pfb"><span class="bar"><i class="warn" style="width:' + p.w + '%"></i></span><b>' + esc(p.qty) + '</b></div><div class="pfm">' + esc(p.share) + ' of base · most pending ' + esc(p.high) + '</div></div>'; }).join('') + '</div><p class="note">' + esc(ov.pendNote.split('.')[0]) + '.</p>';
+  };
+  const finFlow = function (v) {
+    const steps = [['Value of paddy procured', fmtCr(v.valueCr), '', 'at MSP'], ['Paid to farmers', fmtCr(v.paid), tone(v.farmPaidPct, 0.99, 0.95), pct(v.payVal) + ' of value'], ['Paid within 24 h', fmtCr(v.pay24W), tone(v.pay24, 0.9, 0.8), pct(v.pay24) + ' of payments'], ['Pending to farmers', fmtCr(v.pending), tone(v.pending / (v.valueCr || 1), 0.001, 0.01, false), fmtN(v.farmersPend) + ' farmers']];
+    return '<div class="fflow">' + steps.map(function (x) { return '<div class="ff"><div class="ffl">' + esc(x[0]) + '</div><div class="ffv ' + (x[2] || '') + '">' + esc(x[1]) + '</div><div class="ffs">' + esc(x[3]) + '</div></div>'; }).join('') + '</div>';
+  };
+  // Stage-wise performance versus target as a bar chart (district deep dive).
+  const stageBars = function (v) {
+    const S = [['Procure', v.procPct, tone(v.procPct, 0.95, 0.8)], ['Process', v.cmrPct, tone(v.cmrPct, 0.6, 0.45)], ['Storage', v.cap ? v.util : 0, v.cap ? tone(v.util, 0.85, 0.93, false) : ''], ['Transport', v.s1Pct, tone(v.s1Pct, 0.9, 0.8)], ['Distribute', v.s2Pct, tone(v.s2Pct, 0.85, 0.7)], ['Service', v.distPct, tone(v.distPct, 0.9, 0.8)]];
+    return '<div class="vbars">' + S.map(function (x) { const h = Math.max(2, Math.min(100, Math.round(x[1] * 100))); return '<div class="vb"><div class="vbv ' + x[2] + '">' + pct(x[1]) + '</div><div class="vbb"><i class="' + x[2] + '" style="height:' + h + '%"></i><em></em></div><div class="vbl">' + esc(x[0]) + '</div></div>'; }).join('') + '</div><p class="note">Bar = achievement against each stage\'s base (target, CMR due, capacity, plan, allotment, received) · line = 100%</p>';
+  };
+  const stageTable = function (v, inDistrict) {
+    const rows = [['Procurement', fmtMT(v.target), fmtMT(v.procured), v.procPct, tone(v.procPct, 0.95, 0.8), 'proc'], ['Processing (CMR)', fmtMT(v.cmrDue), fmtMT(v.cmrDel), v.cmrPct, tone(v.cmrPct, 0.6, 0.45), 'cmr'], ['Storage', fmtMT(v.cap), fmtMT(v.stock), v.util, v.cap ? tone(v.util, 0.85, 0.93, false) : '', 'stor'], ['Transportation', fmtMT(v.s1Plan), fmtMT(v.s1Moved), v.s1Pct, tone(v.s1Pct, 0.9, 0.8), 's1'], ['Distribution', fmtMT(v.s2Allot), fmtMT(v.s2Fps), v.s2Pct, tone(v.s2Pct, 0.85, 0.7), 's2'], ['Beneficiary service', fmtMT(v.s2Fps), fmtMT(v.dist), v.distPct, tone(v.distPct, 0.9, 0.8), 's2']];
+    return '<div class="tw"><table class="dt compact"><thead><tr><th class="first">Stage</th><th class="r">Base</th><th class="r">Actual</th><th class="r">Achievement</th><th class="txt">Status</th></tr></thead><tbody>' + rows.map(function (r) { return '<tr><td class="first drill"' + on(function () { if (inDistrict) A().setStage(r[5]); else A().go('chain', r[5]); }) + '>' + esc(r[0]) + '</td><td class="r">' + esc(r[1]) + '</td><td class="r">' + esc(r[2]) + '</td><td class="r"><span class="bar" style="width:70px;margin-right:6px"><i class="' + r[4] + '" style="width:' + Math.min(100, Math.round(r[3] * 100)) + '%"></i></span><b class="' + r[4] + '">' + pct(r[3]) + '</b></td><td class="txt"><span class="status ' + r[4] + '">' + U.dot(r[4]) + TONE_WORD[r[4]] + '</span></td></tr>'; }).join('') + '</tbody></table></div>';
+  };
+
   /* ---------- progressive disclosure ---------- */
   // A section that is always on the page but closed until asked for. `meta` is the factual count shown in the header.
   const fold = function (key, title, meta, body, opts) {
@@ -30,7 +134,7 @@ window.Pages = (function () {
     const b = p.brief;
     return card('<h3>Since your last visit</h3><p class="sub muted small">' + esc(b.sub) + '</p>' + (b.loading ? '<p class="note">Checking the records…</p>' : b.has ? '<div class="alist" style="margin-top:8px">' + b.items.map(function (it) { return '<div class="aitem"' + on(it.go) + '><span class="ai ' + U.toneOf(it.cls || it.dot) + '"></span><div><div class="at">' + esc(it.text) + '</div><div class="am">' + esc(it.meta || '') + '</div></div></div>'; }).join('') + '</div>' : '<p class="note">Nothing new needs your attention since your last visit.</p>') + (b.loading ? '<div style="margin-top:6px">' + U.btn('Check now', b.open, 'xs ghost', 'refresh') + '</div>' : ''), 'flat');
   };
-  const rail = function (p, extra) { return aisumCard(p) + (extra || '') + rpCard(p) + briefCard(p); };
+  const rail = function (p, extra) { return (extra || '') + (p.rp && p.rp.items && p.rp.items.length ? keyAlerts(p, { feedN: 0 }) : ''); };
 
   const feedList = function (feed) { return '<div class="alist">' + (feed || []).map(function (f) { return '<div class="aitem"' + on(f.go) + '><span class="ai ' + (f.prio === 'Critical' ? 'bad' : f.prio === 'High' ? 'warn' : '') + '"></span><div><div class="at">' + U.pill(f.prio, f.pcls) + ' ' + esc(f.title) + '</div><div class="am">' + esc(f.meta) + '</div></div></div>'; }).join('') + '</div>'; };
   const queueBlock = function (q, opts) {
@@ -92,33 +196,32 @@ window.Pages = (function () {
 
   /* ---------- Executive Overview ---------- */
   const overview = function (vm) {
-    const p = vm.page;
+    const p = vm.page; const v = scopeVals(); const dn0 = (E.L.state.path || [])[0];
     const fin = E.peek({ module: 'fin', stage: 'all', pivot: false, kpiOpen: null });
     const prep = E.peek({ module: 'prep', stage: 'all', pivot: false, kpiOpen: null });
     const al = E.peek({ module: 'alerts', stage: 'all', pivot: false, kpiOpen: null });
-    const trend = p.sChart && p.sChart.has ? sh(p.sChart.title, p.sChart.sub) + U.lineChart(p.sChart) :
-      '<div class="grid">' + (p.prio || []).slice(0, 3).map(function (pr) { return '<div class="c4"><div class="small" style="font-weight:600;margin-bottom:6px">' + esc(pr.title) + '</div>' + U.bars(pr.bars.slice(0, 5)) + '<div style="margin-top:6px">' + U.link(pr.goLabel.charAt(0).toUpperCase() + pr.goLabel.slice(1) + ' →', pr.go) + '</div></div>'; }).join('') + '</div>';
-    const insights = p.aisum && p.aisum.has ? '<div class="alist">' + p.aisum.items.map(function (it) { return '<div class="aitem"' + on(it.go) + '><span class="ai ' + U.toneOf(it.cls) + '"></span><div><div class="at">' + esc(it.text) + '</div><div class="am">' + esc(it.cta) + ' →</div></div></div>'; }).join('') + '</div>' : '';
-    const attention = p.rp && p.rp.items ? '<div class="alist">' + p.rp.items.map(function (it) { return '<div class="aitem"' + on(it.go) + '><span class="ai ' + U.toneOf(it.dot) + '"></span><div><div class="at">' + esc(it.text) + '</div><div class="am">' + esc(it.meta) + '</div></div></div>'; }).join('') + '</div>' : '';
-    const nAttn = p.ov.hasAttn ? p.ov.attn.length : 0; const nFeed = (p.feed || []).length; const qN = p.queue ? p.queue.tabs.map(function (t) { return t.label; }).join(' · ') : '';
+    const fpsP = E.peek({ module: 'glance', glance: 'fps', stage: 'all', pivot: false, kpiOpen: null });
+    const headline = [p.kpis[0], p.kpis[2], p.kpis[5], p.kpis[3], p.kpis[4], fpsP ? fpsP.page.kpis.filter(function (k) { return /Distributed/.test(k.label); })[0] || p.kpis[6] : p.kpis[6]].filter(Boolean);
+    const others = p.kpis.filter(function (k) { return headline.indexOf(k) < 0; });
     const first =
-      '<div class="hero">' + U.tiles(p.kpis, { cls: 'nine' }) + '</div>' +
-      card(sh('Paddy-to-beneficiary flow', 'Stage spine · 01 Procurement → 02 CMR → 05 Storage → 03 Stage 1 → 04 Stage 2', U.btn('Value chain', function () { A().go('chain', 'all'); }, 'sm', 'chain')) + U.flowStrip(p.flow)) +
-      '<div class="grid"><div class="c7">' + mapCard(vm) + '</div><div class="c5 stack">' +
-        card(sh('Insights & actions', p.aisum.lead, U.btn('Intelligence', p.aisum.open, 'xs ghost', 'brain')) + insights) +
-        card(sh('Needs your attention', 'Exceptions only · state-wide') + attention) + '</div></div>';
+      '<div class="hero">' + U.tiles(headline, { cls: 'six', icons: ['sprout', 'mill', 'warehouse', 'truck', 'shop', 'family'] }) + '</div>' +
+      card(sh('End-to-end supply chain performance', 'From farmer to beneficiary · ' + (dn0 || 'all districts') + ' · season to date', statusLegend() + U.btn('View detailed value chain →', function () { A().go('chain', 'all'); }, 'sm')) + chainTiles(v, !!dn0)) +
+      '<div class="grid"><div class="c5">' + districtPerformance(vm) + '</div><div class="c4">' + trendPanel(p, vm) + '</div><div class="c3">' + keyAlerts(p) + '</div></div>' +
+      '<div class="grid">' +
+        '<div class="c4">' + stripCard('Financial overview', fin ? fin.page.kpis.slice(0, 4) : [], 'View details →', function () { A().go('finance'); }) + '</div>' +
+        '<div class="c4">' + stripCard('Preparedness & compliance', prep ? [prep.page.kpis[0], prep.page.kpis[1], prep.page.kpis[2], prep.page.kpis[4]] : [], 'View details →', function () { A().go('prep'); }) + '</div>' +
+        '<div class="c4">' + stripCard('Grievances & public service', [{ label: 'Open grievances', value: fmtN(v.grvOpen), sub: 'PGRS + IVRS', vcls: tone(v.grvOpen, 300, 900, false) }, { label: 'Category A', value: fmtN(v.grvA), sub: 'highest priority', vcls: '' }, { label: 'Critical incidents', value: fmtN(v.p1), sub: fmtN(v.alerts) + ' open in total', vcls: tone(v.p1, 0, 2, false) }, { label: 'FPS stock-out days', value: fmtN(v.stockout), sub: 'this month', vcls: tone(v.stockout, 100, 300, false) }], 'View details →', function () { A().go('voice'); }) + '</div>' +
+      '</div>';
     const rest = foldGroup([
-      fold('ov.alerts', 'Critical alerts & incident queue', nFeed + ' live · ' + qN, feedList(p.feed) + (p.queue ? '<div style="margin-top:14px">' + queueBlock(p.queue, { max: 10 }) + '</div>' : ''), { right: U.btn('Incidents', function () { A().go('incidents'); }, 'xs ghost') }),
-      fold('ov.districts', 'District performance', nAttn + ' districts needing attention', '<div class="grid"><div class="c6"><div class="small" style="font-weight:600;margin-bottom:6px">Needing attention</div>' + attnBlock(p.ov) + '</div><div class="c6"><div class="small" style="font-weight:600;margin-bottom:6px">Weakest by stage</div>' + weakBlock(p.ov) + '</div></div>', { right: U.btn('District Intelligence', function () { A().go('districts'); }, 'xs ghost') }),
-      fold('ov.trends', 'Key trends', 'Lowest-ranked districts by measure', trend),
-      fold('ov.pending', 'Pending quantity by stage', p.ov.pend.length + ' stages · ' + p.ov.asOf, pendBlock(p.ov)),
-      fold('ov.fin', 'Financial overview', fin ? fin.page.kpis.slice(0, 4).map(function (k) { return k.label + ' ' + k.value; }).join(' · ') : '', fin ? strip(fin.page.kpis.slice(0, 4)) : '', { right: U.btn('Financial Intelligence', function () { A().go('finance'); }, 'xs ghost') }),
-      fold('ov.prep', 'Preparedness & compliance', prep ? 'Overall readiness ' + prep.page.kpis[0].value + ' · Kharif 2026-27' : '', prep ? strip(prep.page.kpis.slice(0, 4)) : '', { right: U.btn('Preparedness', function () { A().go('prep'); }, 'xs ghost') }),
-      fold('ov.voice', 'Grievances & public service', al ? al.page.kpis.filter(function (k) { return /Grievance/.test(k.label); }).map(function (k) { return k.value + ' open'; }).join('') : '', al ? strip(al.page.kpis.filter(function (k) { return /Grievance|Avg age|Escalated|Critical/.test(k.label); }).slice(0, 4)) : '', { right: U.btn('Service & Public Voice', function () { A().go('voice'); }, 'xs ghost') }),
-      fold('ov.brief', 'Since your last visit', p.brief.loading ? 'Checking…' : (p.brief.has ? p.brief.items.length + ' changes · ' + p.brief.sub : 'Nothing new'), p.brief.loading ? '<p class="note">Checking the records…</p>' + U.btn('Check now', p.brief.open, 'xs ghost', 'refresh') : p.brief.has ? '<div class="alist">' + p.brief.items.map(function (it) { return '<div class="aitem"' + on(it.go) + '><span class="ai ' + U.toneOf(it.cls || it.dot) + '"></span><div><div class="at">' + esc(it.text) + '</div><div class="am">' + esc(it.meta || '') + '</div></div></div>'; }).join('') + '</div>' : U.empty('Nothing new needs your attention since your last visit.')),
+      fold('ov.kpis', 'Other headline KPIs', others.map(function (k) { return k.label + ' ' + k.value; }).join(' · '), U.tiles(others, { cls: 'three' })),
+      fold('ov.alerts', 'Incident work queue', p.queue ? p.queue.tabs.map(function (t) { return t.label; }).join(' · ') : '', p.queue ? queueBlock(p.queue, { max: 10 }) : '', { right: U.btn('Incidents', function () { A().go('incidents'); }, 'xs ghost') }),
+      fold('ov.attn', 'Districts needing attention', (p.ov.hasAttn ? p.ov.attn.length : 0) + ' districts below threshold on 4 or more of 9 measures', attentionTable(districtHealth(), 'District') + '<div class="small" style="font-weight:700;margin:14px 0 6px">Weakest district by measure</div>' + weakestTable(p.ov), { right: U.btn('District Intelligence', function () { A().go('districts'); }, 'xs ghost') }),
+      fold('ov.pending', 'Pending quantity by stage', p.ov.pend.length + ' stages · ' + p.ov.asOf, pendFlow(p.ov)),
+      fold('ov.matrix', p.ov.mxTitle, p.ov.mxSub, matrixBlock(p.ov)),
+      fold('ov.brief', 'Since your last visit', p.brief.loading ? 'Checking…' : (p.brief.has ? p.brief.items.length + ' changes in the last 24 hours' : 'Nothing new'), p.brief.loading ? '<p class="note">Checking the records…</p>' + U.btn('Check now', p.brief.open, 'xs ghost', 'refresh') : p.brief.has ? '<div class="alist">' + p.brief.items.map(function (it) { return '<div class="aitem"' + on(it.go) + '><span class="ai ' + U.toneOf(it.cls || it.dot) + '"></span><div><div class="at">' + esc(it.text) + '</div></div></div>'; }).join('') + '</div>' : U.empty('Nothing new since your last visit.')),
       fold('ov.quick', 'Quick view', (p.scores[0] ? p.scores[0].items.length + ' KPIs' : '') + ' · actual, target, variance, freshness', scoresBlock(p.scores, { title: 'Quick view', bare: true }))
     ]);
-    return { title: 'Executive Overview', sub: (p.flowScope || 'Andhra Pradesh') + ' · season to date', body: first + rest, rail: '' };
+    return { title: 'Executive Overview', sub: 'Snapshot of the entire supply chain, key numbers and alerts · ' + (p.flowScope || 'Andhra Pradesh'), body: first + rest, rail: '' };
   };
 
   /* ---------- Value chain · all stages ---------- */
@@ -134,8 +237,8 @@ window.Pages = (function () {
       card(sh('Paddy-to-beneficiary flow', 'Physical order of the chain') + U.flowStrip(p.flow)) +
       '<div class="grid" style="margin-top:12px"><div class="c12"><div class="stagegrid">' + cards + '</div></div>' +
       '<div class="c6">' + card(sh('Pending quantity by stage', p.ov.asOf) + pendBlock(p.ov)) + '</div>' +
-      '<div class="c6">' + card(sh(p.ov.attnTitle, 'Below threshold on 4 or more of 9 measures') + attnBlock(p.ov) + '<div class="small" style="font-weight:700;margin:10px 0 4px">Weakest by stage</div>' + weakBlock(p.ov)) + '</div>' +
-      '</div>' + foldGroup([fold('vc.matrix', p.ov.mxTitle, p.ov.mxSub, matrixBlock(p.ov))]);
+      '<div class="c6">' + card(sh('Weakest district by measure', 'Lowest district on each of the 9 measures') + weakestTable(p.ov)) + '</div>' +
+      '</div>' + foldGroup([fold('vc.attn', 'Districts needing attention', (p.ov.hasAttn ? p.ov.attn.length : 0) + ' districts below threshold on 4 or more of 9 measures', attentionTable(districtHealth(), 'District')), fold('vc.matrix', p.ov.mxTitle, p.ov.mxSub, matrixBlock(p.ov))]);
     return { title: 'Value Chain', sub: 'Performance by stage against target, plan, capacity or allotment', body: body, rail: rail(p) };
   };
 
@@ -178,40 +281,81 @@ window.Pages = (function () {
 
   /* ---------- District Intelligence ---------- */
   const districts = function (vm) {
-    const p = vm.page;
-    const body = '<div class="grid"><div class="c7">' + mapCard(vm, { title: 'District supply-chain health' }) + '</div>' +
-      '<div class="c5 stack">' + card(sh(p.ov.attnTitle, 'Below threshold on 4 or more of 9 measures') + attnBlock(p.ov)) + card(sh('Weakest by stage', 'Lowest district on each measure') + weakBlock(p.ov)) + '</div>' +
-      '<div class="c12">' + card(sh(p.ov.mxTitle, p.ov.mxSub) + matrixBlock(p.ov)) + '</div>' +
-      '<div class="c12">' + U.dataTable(p.table, { title: 'All districts', sub: '' }) + '</div></div>';
-    return { title: 'District Intelligence', sub: 'District-wise view across the supply chain', body: body, rail: rail(p) };
+    const p = vm.page; const dh = districtHealth();
+    const c = { good: dh.filter(function (x) { return x.h.status === 'good'; }).length, warn: dh.filter(function (x) { return x.h.status === 'warn'; }).length, bad: dh.filter(function (x) { return x.h.status === 'bad'; }).length };
+    const tiles = '<div class="tiles four hero">' + [['good', c.good, 'Districts on track', 'No measure below threshold', 'check'], ['warn', c.warn, 'Districts to watch', 'One to three measures below threshold', 'alert'], ['bad', c.bad, 'Districts needing attention', 'Four or more measures below threshold', 'alert'], ['', dh.filter(function (x) { return x.h.bad.length >= 7; }).length, 'Districts in critical disruption', 'Seven or more measures below threshold', 'info']].map(function (t) { return '<div class="tile"><div class="tl">' + icon(t[4], 'tic') + '<span class="tlab">' + esc(t[2]) + '</span></div><div class="tv ' + t[0] + '">' + t[1] + '</div><div class="ts">' + esc(t[3]) + '</div></div>'; }).join('') + '</div>';
+    const m = vm.map;
+    const mapCardV = card(sh('District supply-chain health', 'Overall status across all aspects of civil supplies', U.select(m.metrics, m.metric, m.onMetric, '', 'v', 'label')) + statusMap(vm) + statusLegend());
+    const table = card(sh('Districts requiring attention', '', U.btn('View all districts →', function () { A().S.fold('di.all', true); }, 'xs ghost')) + attentionTable(dh, 'District'));
+    const insights = card(sh('Key insights', '') + '<div class="kals">' + [['good', c.good + ' districts are on track', 'Stable supply chain and service performance.'], ['warn', c.warn + ' districts need monitoring', 'One to three measures below threshold.'], ['bad', c.bad + ' districts require attention', 'Four or more measures below threshold; intervention needed.'], ['', 'No district in critical disruption', 'Procurement, milling, storage and distribution continue across the state.']].map(function (x) { return '<div class="kal"><span class="ai ' + x[0] + '"></span><div><div class="at">' + esc(x[1]) + '</div><div class="am">' + esc(x[2]) + '</div></div></div>'; }).join('') + '</div>');
+    const recent = card(sh('Recent developments', 'Last 24 hours') + (p.brief && p.brief.has ? '<div class="kals">' + p.brief.items.slice(0, 6).map(function (it) { return '<div class="kal"' + on(it.go) + '><span class="ai ' + U.toneOf(it.cls || it.dot) + '"></span><div><div class="at">' + esc(it.text) + '</div></div></div>'; }).join('') + '</div>' : '<p class="note">' + esc(p.brief && p.brief.loading ? 'Checking the records…' : 'Nothing new since your last visit.') + '</p>'));
+    const body = tiles + '<div class="grid"><div class="c6">' + mapCardV + '</div><div class="c6">' + table + '</div><div class="c4">' + insights + '</div><div class="c4">' + card(sh('Weakest district by measure', '') + weakestTable(p.ov)) + '</div><div class="c4">' + recent + '</div></div>' +
+      foldGroup([fold('di.all', 'All districts · ' + p.table.title, p.table.rows.length + ' districts', U.dataTable(p.table, { bare: true })), fold('di.matrix', p.ov.mxTitle, p.ov.mxSub, matrixBlock(p.ov))]);
+    return { title: 'District Intelligence', sub: 'Overall district-wise view across the entire supply chain', body: body, rail: '' };
   };
   const district = function (vm, k) {
-    const p = vm.page; const S = A().S; const dn = (E.L.state.path || [])[0];
+    const p = vm.page; const S = A().S; const dn = (E.L.state.path || [])[0]; const v = distVals(dn); const h = health(v);
     const tabs = U.stepper(k, function (x) { A().setStage(x); });
     if (k !== 'all') { const st = stage(vm, k, S.sub); return { title: esc(dn) + ' · ' + st.title, sub: '', body: tabs + st.body, rail: st.rail }; }
     if (!p.isHome) { return { title: p.title, sub: '', body: tabs + extras(p) + (p.kpis.length ? U.tiles(p.kpis, { cls: 'six' }) : '') + (p.hasTable ? U.dataTable(p.table, { title: p.table.title, sub: p.table.note }) : '') + (p.hasT2 ? U.dataTable(p.t2, { max: 60 }) : '') + scoresBlock(p.scores) + rxBlock(p.rx), rail: rail(p) }; }
-    const body = tabs + card(sh('Headline KPIs', dn + ' · season to date') + U.tiles(p.kpis, { cls: 'six' }), 'flat') +
-      card(sh('Paddy-to-beneficiary flow', dn) + U.flowStrip(p.flow)) +
-      '<div class="grid" style="margin-top:12px">' +
-      '<div class="c7">' + U.dataTable(p.table, { title: p.table.title, sub: p.table.note }) + '</div>' +
-      '<div class="c5">' + card(sh(p.ov.attnTitle, 'Below threshold on 4 or more of 9 measures') + attnBlock(p.ov) + '<div class="small" style="font-weight:700;margin:10px 0 4px">Weakest by stage</div>' + weakBlock(p.ov)) + '</div>' +
-      (p.queue ? '<div class="c12">' + card(sh('Incident work queue', p.queue.note) + queueBlock(p.queue, { max: 10 })) + '</div>' : '') +
-      '<div class="c6">' + card(sh('Pending quantity by stage', p.ov.asOf) + pendBlock(p.ov)) + '</div>' +
-      '<div class="c6">' + mapCard(vm, { title: 'Position in the state' }) + '</div>' +
-      '<div class="c12">' + card(sh(p.ov.mxTitle, p.ov.mxSub) + matrixBlock(p.ov)) + '</div>' +
-      (p.scores && p.scores.length ? '<div class="c12">' + scoresBlock(p.scores) + '</div>' : '') + '</div>';
-    return { title: p.title, sub: 'Operational view of ' + dn, body: body, rail: rail(p) };
+    const head = '<div class="dhead"><div><span class="score ' + h.status + '">Overall score: ' + h.score + '%</span><span class="status ' + h.status + '">' + U.dot(h.status) + TONE_WORD[h.status] + '</span></div><div class="small muted">Key issues: ' + (h.bad.concat(h.warn).slice(0, 4).join(' | ') || 'none') + '</div></div>';
+    const fpsP = E.peek({ module: 'glance', glance: 'fps', stage: 'all', pivot: false, kpiOpen: null });
+    const headline = [p.kpis[0], p.kpis[2], p.kpis[5], p.kpis[3], p.kpis[4], fpsP ? fpsP.page.kpis.filter(function (k2) { return /Distributed/.test(k2.label); })[0] || p.kpis[6] : p.kpis[6]].filter(Boolean);
+    const others = p.kpis.filter(function (k2) { return headline.indexOf(k2) < 0; });
+    const mandals = mandalsOf(dn).map(function (m) { return { name: m.name, v: m.v, h: health(m.v), id: m.id }; });
+    const mc = { good: mandals.filter(function (x) { return x.h.status === 'good'; }).length, warn: mandals.filter(function (x) { return x.h.status === 'warn'; }).length, bad: mandals.filter(function (x) { return x.h.status === 'bad'; }).length };
+    const glance = card(sh('District at a glance', '') + '<div class="grid dpg"><div class="c5">' + statusMap(vm, { small: true, labels: false }) + '</div><div class="c7">' + U.facts([{ k: 'Mandals', v: fmtN(mandals.length) }, { k: 'Ration shops (FPS)', v: fmtN(v.fps) }, { k: 'Ration cards', v: fmtN(v.cards) }, { k: 'Farmers registered', v: fmtN(v.regFarm) }, { k: 'Rice mills', v: fmtN(v.mills) }, { k: 'Buffer godowns', v: fmtN(v.godowns) }]) + '<div class="scount" style="margin-top:10px"><span><i class="dot good"></i>On track (' + mc.good + ')</span><span><i class="dot warn"></i>At risk (' + mc.warn + ')</span><span><i class="dot bad"></i>Needs attention (' + mc.bad + ')</span></div><div style="margin-top:8px">' + U.link('View mandal-wise performance →', function () { A().S.fold('dd.mandals', true); }) + '</div></div></div>');
+    const perf = card(sh('Value chain performance', 'Achievement vs each stage\'s base') + stageBars(v));
+    const HV = { 'Procurement vs target': [pct(v.procPct), 'of target'], 'Farmers paid within 24 h': [pct(v.pay24), 'of payments'], 'CMR delivered': [pct(v.cmrPct), 'of CMR due'], 'Stage-I moved': [pct(v.s1Pct), 'of plan'], 'Stage-II to FPS': [pct(v.s2Pct), 'of allotment'], 'Godown utilisation': [pct(v.util), 'of capacity'], 'Critical incidents': [fmtN(v.p1), 'open'], 'GPS route deviations': [fmtN(v.vehDev), 'vehicles off route'], 'CCTV online': [pct(v.camOnline), 'of cameras'] };
+    const hlItems = h.bad.map(function (m) { return ['bad', m]; }).concat(h.warn.map(function (m) { return ['warn', m]; })).slice(0, 6);
+    const hl = card(sh('Key highlights', 'Measures below threshold') + (hlItems.length ? '<div class="kals">' + hlItems.map(function (x) { return '<div class="kal"><span class="ai ' + x[0] + '"></span><div><div class="at">' + esc(HV[x[1]][0]) + ' · ' + esc(x[1]) + '</div><div class="am">' + esc(HV[x[1]][1]) + '</div></div></div>'; }).join('') + '</div>' : U.empty('All measures on track.')));
+    const flow = card(sh('Supply chain flow', dn + ' · season to date', statusLegend()) + chainTiles(v, true));
+    const grv = (function () { const g = grievOf(dn); const open = g.filter(function (x) { return x.open; }).length; const resolved = g.length - open; const late = g.filter(function (x) { return x.open && x.ageH > 168; }).length; return card(sh('Grievances', 'PGRS and IVRS') + '<div class="metrics" style="grid-template-columns:repeat(3,1fr)"><div class="metric"><div class="l">Total</div><div class="v">' + fmtN(g.length) + '</div></div><div class="metric"><div class="l">Open</div><div class="v warn">' + fmtN(open) + '</div></div><div class="metric"><div class="l">Open > 7 days</div><div class="v bad">' + fmtN(late) + '</div></div></div><p class="note">' + fmtN(resolved) + ' resolved · ' + pct(resolved / (g.length || 1)) + '</p>'); })();
+    const stageTbl = card(sh('Stage-wise performance details', '') + stageTable(v, true));
+    const mandalTB = card(sh('Mandal-wise performance', vm.map.metricLabel) + '<div class="small" style="font-weight:700;margin-bottom:6px">Top 5 mandals</div>' + rankList(mandals, vm.map.metric, true, 5).replace(/data-on="\d+"/g, '') + '<div class="small" style="font-weight:700;margin:12px 0 6px">Bottom 5 mandals</div>' + rankList(mandals, vm.map.metric, false, 5).replace(/data-on="\d+"/g, ''));
+    const issues = card(sh('Open issues & interventions', '', U.btn('View all →', function () { A().go('incidents'); }, 'xs ghost')) + (function () { const l = incidentsOf(dn).filter(function (x) { return x.prio === 'P1' || x.prio === 'P2'; }).slice(0, 6); const acts = openDecisionsFor(dn); return l.length ? '<div class="tw"><table class="dt compact"><thead><tr><th class="first">Issue</th><th class="txt">Stage</th><th class="txt">Age</th><th class="txt">Status</th></tr></thead><tbody>' + l.map(function (x) { return '<tr><td class="first">' + esc(x.title) + '</td><td class="txt">' + esc(STAGE_NAME[x.stage]) + ' · ' + esc(x.ent) + '</td><td class="txt">' + (x.ageH >= 24 ? Math.round(x.ageH / 24) + ' days' : Math.round(x.ageH) + ' h') + '</td><td class="txt"><span class="astat ' + (x.status === 'Escalated' ? 'bad' : x.status === 'In progress' ? 'on' : '') + '">' + esc(x.status) + '</span></td></tr>'; }).join('') + '</tbody></table></div>' + (acts.length ? '<p class="note">' + acts.length + ' decision' + (acts.length > 1 ? 's' : '') + ' open for this district in the decision log.</p>' : '') : U.empty('No high or critical incidents open.'); })());
+    const body = tabs + head + '<div class="hero">' + U.tiles(headline, { cls: 'six', icons: ['sprout', 'mill', 'warehouse', 'truck', 'shop', 'family'] }) + '</div>' +
+      '<div class="grid"><div class="c5">' + glance + '</div><div class="c4">' + perf + '</div><div class="c3">' + hl + '</div></div>' + flow +
+      '<div class="grid"><div class="c5">' + stageTbl + '</div><div class="c4">' + mandalTB + '</div><div class="c3">' + grv + '</div></div>' + issues +
+      foldGroup([
+        fold('dd.kpis', 'Other headline KPIs', others.map(function (k2) { return k2.label + ' ' + k2.value; }).join(' · '), U.tiles(others, { cls: 'three' })),
+        fold('dd.mandals', p.table.title, mandals.length + ' mandals', attentionTable(mandals, 'Mandal') + '<div style="margin-top:12px">' + U.dataTable(p.table, { bare: true }) + '</div>'),
+        fold('dd.queue', 'Incident work queue', p.queue ? p.queue.tabs.map(function (t) { return t.label; }).join(' · ') : '', p.queue ? queueBlock(p.queue, { max: 10 }) : ''),
+        fold('dd.pending', 'Pending quantity by stage', p.ov.pend.length + ' stages', pendFlow(p.ov)),
+        fold('dd.matrix', p.ov.mxTitle, p.ov.mxSub, matrixBlock(p.ov)),
+        fold('dd.quick', 'Quick view', (p.scores[0] ? p.scores[0].items.length + ' KPIs' : ''), scoresBlock(p.scores, { bare: true }))
+      ]);
+    return { title: dn, sub: 'Complete operational and financial view of the district', body: body, rail: '' };
   };
 
   /* ---------- Financial Intelligence ---------- */
   const finance = function (vm) {
-    const p = vm.page; const st = E.L.state.stage;
+    const p = vm.page; const st = E.L.state.stage; const v = scopeVals(); const dn0 = (E.L.state.path || [])[0];
     const chips = U.chips([{ k: 'all', label: 'All stages' }].concat(STAGE_KEYS.map(function (k) { return { k: k, label: SM[k].num + ' ' + SM[k].label }; })).map(function (c) { return { label: c.label, cls: st === c.k ? 'on' : '', pick: function () { A().setStage(c.k); } }; }));
+    // Pending payments analysis from the FTO register.
+    const dns = dn0 ? [dn0] : D.map(function (d) { return d.name; });
+    let ftos = []; dns.forEach(function (d) { ftos = ftos.concat(finBatches(d)); });
+    const pend = ftos.filter(function (f) { return f.group !== 'Credited'; });
+    const byG = {}; pend.forEach(function (f) { byG[f.group] = (byG[f.group] || 0) + f.amt; });
+    const ageB = [['0–24 h', 0, 24], ['24–48 h', 24, 48], ['2–7 days', 48, 168], ['> 7 days', 168, 1e9]].map(function (b) { const n = pend.filter(function (f) { return f.hAgo >= b[1] && f.hAgo < b[2]; }).length; return { label: b[0], w: Math.round(n / (pend.length || 1) * 100), v: fmtN(n), c: b[1] >= 168 ? '#D8714F' : b[1] >= 48 ? '#E0AE4F' : '#5B8FD0' }; });
+    const why = {}; pend.filter(function (f) { return f.why; }).forEach(function (f) { why[f.why] = (why[f.why] || 0) + 1; });
+    const pendCard = card(sh('Pending payments analysis', fmtN(pend.length) + ' FTOs not yet credited · ' + fmtCr(pend.reduce(function (a, f) { return a + f.amt; }, 0))) + '<div class="grid"><div class="c6"><div class="small" style="font-weight:700;margin-bottom:6px">By status</div>' + U.bars(Object.keys(byG).sort(function (a, b) { return byG[b] - byG[a]; }).map(function (g) { return { label: g, w: Math.round(byG[g] / (Math.max.apply(null, Object.keys(byG).map(function (x) { return byG[x]; })) || 1) * 100), v: fmtCr(byG[g]), c: g === 'Rejected' || g === 'Failed' ? '#D8714F' : '#5B8FD0' }; })) + '</div><div class="c6"><div class="small" style="font-weight:700;margin-bottom:6px">Ageing</div>' + U.bars(ageB) + (Object.keys(why).length ? '<div class="small" style="font-weight:700;margin:10px 0 6px">Rejection reasons</div>' + U.bars(Object.keys(why).sort(function (a, b) { return why[b] - why[a]; }).map(function (w) { return { label: w, w: Math.round(why[w] / (why[Object.keys(why)[0]] || 1) * 100), v: fmtN(why[w]), c: '#D8714F' }; })) : '') + '</div></div>');
+    // District-wise utilisation: paid within 24 h status map + top variances.
+    const dh = districtHealth();
+    const varRows = dh.map(function (x) { return x; }).sort(function (a, b) { return b.v.pending - a.v.pending; }).slice(0, 6);
+    const mapV = card(sh('District-wise payment performance', 'Farmers paid within 24 hours') + statusMap(Object.assign({}, vm, { map: Object.assign({}, vm.map, { metric: 'pay24' }) }), {}) + statusLegend());
+    const varCard = card(sh('Top variances', 'Highest pending farmer payments') + '<div class="tw"><table class="dt compact"><thead><tr><th class="first">District</th><th class="r">Paid</th><th class="r">Pending</th><th class="r">Paid ≤ 24 h</th></tr></thead><tbody>' + varRows.map(function (x) { return '<tr><td class="first drill"' + on(function () { A().openDistrict(x.name); }) + '>' + esc(x.name) + '</td><td class="r">' + fmtCr(x.v.paid) + '</td><td class="r"><span class="bar" style="width:60px;margin-right:6px"><i class="bad" style="width:' + Math.round(x.v.pending / (varRows[0].v.pending || 1) * 100) + '%"></i></span><b>' + fmtCr(x.v.pending) + '</b></td><td class="r ' + tone(x.v.pay24, 0.9, 0.8) + '">' + pct(x.v.pay24) + '</td></tr>'; }).join('') + '</tbody></table></div>');
+    const ind = card(sh('Key financial indicators', 'Season to date') + '<div class="sstrip">' + [['Procurement value', fmtCr(v.valueCr), 'paddy at MSP'], ['Miller bank guarantees', fmtCr(v.bg), 'held against CMR'], ['GLT charges pending', fmtCr(v.transPend), 'gunny, labour, transport'], ['Miller incidental charges', fmtCr(v.hamPend), 'pending settlement'], ['Storage charges', fmtCr(v.storCh), 'this season']].map(function (x) { return '<div class="si"><div class="v">' + esc(x[1]) + '</div><div class="l">' + esc(x[0]) + '</div><div class="l2">' + esc(x[2]) + '</div></div>'; }).join('') + '</div>');
     const body = '<div class="tools" style="justify-content:space-between"><div>' + chips + '</div><span class="note" style="margin:0">' + esc(p.sub) + '</span></div>' +
-      U.tiles(p.kpis, { cls: p.kpis.length > 4 ? 'six' : 'four' }) +
-      '<div class="grid" style="margin-top:12px"><div class="c8">' + scoresBlock(p.scores) + '</div><div class="c4">' + chartCard(p) + '</div>' +
-      '<div class="c12">' + U.dataTable(p.table, { title: p.table.title, sub: p.table.note }) + '</div><div class="c12">' + rxBlock(p.rx) + '</div></div>';
-    return { title: 'Financial Intelligence', sub: 'Payments, guarantees and charges by stage', body: body, rail: rail(p) };
+      '<div class="hero">' + U.tiles(p.kpis, { cls: p.kpis.length > 4 ? 'six' : 'four' }) + '</div>' +
+      '<div class="grid"><div class="c7">' + card(sh('Financial flow', 'From paddy value at MSP to farmer credit') + finFlow(v)) + '</div><div class="c5">' + (p.sChart && p.sChart.has ? card(sh(p.sChart.title.split(' · ')[0], p.sChart.sub) + U.lineChart(p.sChart)) : pendCard) + '</div>' +
+      '<div class="c5">' + mapV + '</div><div class="c4">' + varCard + '</div><div class="c3">' + (p.sChart && p.sChart.has ? pendCard : ind) + '</div>' +
+      (p.sChart && p.sChart.has ? '<div class="c12">' + ind + '</div>' : '') + '</div>' +
+      foldGroup([
+        fold('fin.kpis', p.scores[0] ? p.scores[0].title : 'KPI list', p.scores[0] ? p.scores[0].items.length + ' KPIs' : '', scoresBlock(p.scores, { bare: true }), { open: true }),
+        fold('fin.dist', p.table.title, p.table.rows.length + ' rows', '<div class="grid"><div class="c8">' + U.dataTable(p.table, { bare: true }) + '</div><div class="c4">' + (p.hasChart ? '<div class="small" style="font-weight:700;margin-bottom:6px">' + esc(p.chart.title) + '</div>' + U.bars(p.chart.bars) : '') + '</div></div>')
+      ]) + rxBlock(p.rx);
+    return { title: 'Financial Intelligence', sub: 'Fund flow, farmer payments, liabilities and charges across districts', body: body, rail: '' };
   };
 
   /* ---------- Preparedness ---------- */
