@@ -16,8 +16,26 @@
 window.Engine = (function () {
   'use strict';
   const E = { L: null, vm: null, fns: [], listeners: [], dirty: false, ready: false };
+  // Keep the example District Manager inside the assigned district, including
+  // temporary views, saved report filters and callbacks from older screens.
+  const scopedPatch = function (patch) {
+    const current = E.L.state;
+    const next = Object.assign({}, current, typeof patch === 'function' ? patch(current) : patch);
+    if (next.role === 'dm') {
+      const district = current.role === 'dm' ? current.dm : next.dm;
+      next.dm = district;
+      next.path = next.path && next.path[0] === district ? next.path : [district];
+      next.pvDist = district;
+      if (current.role !== 'dm') {
+        next.modal = null; next.rxRec = null; next.act = null;
+        next.kpiOpen = null; next.mxSel = null; next.pvSel = null;
+        next.intelOpen = null; next.intelCtx = null; next.intelMsgs = []; next.chatMsgs = null;
+      }
+    }
+    return next;
+  };
   const host = {
-    __setLogicState(p, cb) { Object.assign(E.L.state, typeof p === 'function' ? p(E.L.state) : p); if (cb) cb(); E.invalidate(); },
+    __setLogicState(p, cb) { Object.assign(E.L.state, scopedPatch(p)); if (cb) cb(); E.invalidate(); },
     forceUpdate() { E.invalidate(); }
   };
   E.boot = function () {
@@ -29,14 +47,14 @@ window.Engine = (function () {
   };
   E.invalidate = function () { if (E.dirty) return; E.dirty = true; Promise.resolve().then(function () { E.dirty = false; E.listeners.forEach(function (f) { f(); }); }); };
   E.onChange = function (f) { E.listeners.push(f); };
-  E.set = function (p) { Object.assign(E.L.state, p); };            // silent (no re-render)
+  E.set = function (p) { Object.assign(E.L.state, scopedPatch(p)); };            // silent (no re-render)
   E.setState = function (p) { E.L.setState(p); };                    // re-renders
   E.render = function () { E.vm = E.L.renderVals(); return E.vm; };
   // Compute a view-model for a temporary state without disturbing navigation history.
   E.withState = function (temp, fn) {
     const L = E.L; const saved = Object.assign({}, L.state);
     const nav = { k: L._navKey, s: L._navSnap, h: L._navHist ? L._navHist.slice() : L._navHist, b: L._navBack };
-    Object.assign(L.state, temp);
+    Object.assign(L.state, scopedPatch(temp));
     let out;
     try { out = fn(L.renderVals()); } catch (e) { console.warn('withState', e); out = null; }
     L.state = saved; L._navKey = nav.k; L._navSnap = nav.s; L._navHist = nav.h; L._navBack = nav.b;

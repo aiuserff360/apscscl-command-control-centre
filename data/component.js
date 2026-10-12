@@ -2046,6 +2046,7 @@ class Component extends DCLogic {
   buildPrep(path, stage, sk) {
     const self = this; const s = this.state; const isDM = s.role === 'dm';
     const dn = path[0] || null;
+    const scopeDistricts = D.filter(function (d) { return !isDM || d.name === s.dm; });
     const view = s.prepView || 'overview'; const pSel = s.prepParam === undefined || s.prepParam === null ? -1 : s.prepParam; const asc = s.prepSort !== 'desc';
     const T = function (x) { return Object.assign(C(x), { cls: 'txt' }); };
     const bandOf = function (x) { if (x === null || x === undefined) return 'na'; x = Math.round(x * 1000) / 1000; return x >= 0.7 ? 'good' : x >= 0.5 ? 'mod' : 'att'; };
@@ -2056,7 +2057,7 @@ class Component extends DCLogic {
     const ageTxt = function (m) { return m < 60 ? Math.round(m) + ' min ago' : m < 1440 ? Math.round(m / 60) + ' h ago' : Math.round(m / 1440) + ' d ago'; };
     /* statistic for parameter i at district / state */
     const dStat = function (i, d) { const c = prepRaw(d, i); if (!c) return { x: null, num: null, den: null, fresh: 'No report received', stale: false, m: null }; const num = Math.min(c[0], c[1]); const m = age(d, i); return { x: num / c[1], num: num, den: c[1], fresh: ageTxt(m), stale: m > 1440, m: m }; };
-    const sStat = function (i) { let num = 0, den = 0, rep = 0, stale = 0, mn = 1e9; D.forEach(function (d) { const st = dStat(i, d.name); if (st.x !== null) { num += st.num; den += st.den; rep++; if (st.stale) stale++; mn = Math.min(mn, st.m); } }); return { x: rep ? num / den : null, num: num, den: den, rep: rep, fresh: rep ? 'Latest ' + ageTxt(mn) + (stale ? ' · ' + stale + ' districts stale (> 24 h)' : '') : 'No report received', stale: stale > 0 }; };
+    const sStat = function (i) { let num = 0, den = 0, rep = 0, stale = 0, mn = 1e9; scopeDistricts.forEach(function (d) { const st = dStat(i, d.name); if (st.x !== null) { num += st.num; den += st.den; rep++; if (st.stale) stale++; mn = Math.min(mn, st.m); } }); return { x: rep ? num / den : null, num: num, den: den, rep: rep, fresh: rep ? 'Latest ' + ageTxt(mn) + (stale ? ' · ' + stale + ' districts stale (> 24 h)' : '') : 'No report received', stale: stale > 0 }; };
     const stat = function (i) { return dn ? dStat(i, dn) : sStat(i); };
     const scopeName = dn || 'Andhra Pradesh';
     const idxAll = PRM.map(function (p, i) { return i; });
@@ -2064,8 +2065,8 @@ class Component extends DCLogic {
     const rep = idxAll.filter(function (i) { return st17[i].x !== null; });
     const avg = rep.reduce(function (a, i) { return a + st17[i].x; }, 0) / (rep.length || 1);
     const cnt = { good: 0, mod: 0, att: 0, na: 0 }; idxAll.forEach(function (i) { cnt[bandOf(st17[i].x)]++; });
-    const repCells = dn ? rep.length : D.reduce(function (a, d) { return a + idxAll.filter(function (i) { return !prepNA(d.name, i); }).length; }, 0);
-    const totCells = dn ? 17 : D.length * 17;
+    const repCells = dn ? rep.length : scopeDistricts.reduce(function (a, d) { return a + idxAll.filter(function (i) { return !prepNA(d.name, i); }).length; }, 0);
+    const totCells = dn ? 17 : scopeDistricts.length * 17;
     const distAvg = function (d) { const xs = idxAll.map(function (i) { return dStat(i, d).x; }).filter(function (x) { return x !== null; }); return xs.length ? xs.reduce(function (a, b) { return a + b; }, 0) / xs.length : null; };
     const k = function (label, value, sub, t, key, extra) { return self.mkK(label, value, sub, t, key, extra); };
     const listBars = function (band) { return idxAll.filter(function (i) { return bandOf(st17[i].x) === band; }).map(function (i) { const x = st17[i].x; return { label: pad(i + 1, 2) + ' · ' + PRM[i][0], w: x === null ? 0 : Math.max(2, Math.round(x * 100)), v: x === null ? 'No data' : pct(x), c: BC[band] }; }); };
@@ -2075,15 +2076,15 @@ class Component extends DCLogic {
       const open = new Date(2026, 9, 15), close = new Date(2027, 0, 31), now = new Date();
       const days = Math.ceil((open - now) / 86400000), left = Math.ceil((close - now) / 86400000);
       const proj = function (d) { const a = distAvg(d); return a === null ? null : Math.min(0.99, a + rr(d + 'pace', 0.008, 0.016) * Math.max(0, days)); };
-      const pv = dn ? proj(dn) : (function () { const xs = D.map(function (d) { return proj(d.name); }).filter(function (x) { return x !== null; }); return xs.reduce(function (a, b) { return a + b; }, 0) / xs.length; })();
+      const pv = dn ? proj(dn) : (function () { const xs = scopeDistricts.map(function (d) { return proj(d.name); }).filter(function (x) { return x !== null; }); return xs.reduce(function (a, b) { return a + b; }, 0) / xs.length; })();
       const fmtD = function (d) { return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }); };
-      const bars = D.map(function (d) { return { name: d.name, v: { _p: proj(d.name) } }; }).filter(function (x) { return x.v._p !== null; }).sort(function (x, y) { return x.v._p - y.v._p; }).map(function (x) { const b = bandOf(x.v._p); return { label: x.name, w: Math.round(x.v._p * 100), v: pct(x.v._p), c: BC[b] }; });
+      const bars = scopeDistricts.map(function (d) { return { name: d.name, v: { _p: proj(d.name) } }; }).filter(function (x) { return x.v._p !== null; }).sort(function (x, y) { return x.v._p - y.v._p; }).map(function (x) { const b = bandOf(x.v._p); return { label: x.name, w: Math.round(x.v._p * 100), v: pct(x.v._p), c: BC[b] }; });
       return k('Forecast window · Kharif 2026-27', days > 0 ? 'Opens in ' + days + ' days' : left > 0 ? 'Open · ' + left + ' days left' : 'Closed', fmtD(open) + ' – ' + fmtD(close) + ' · projected ' + pct(pv) + ' at opening', BT[bandOf(pv)], null, { def: 'Expected opening and closing of the coming season, and projected readiness on opening day if preparation continues at the current pace. Dates are placeholders until confirmed from the procurement calendar.', calc: 'Projected readiness = current readiness + current daily improvement × days to opening (capped at 99%)', drill: 'Season → district → parameter', bars: bars, barsTitle: 'Projected readiness at opening, least ready first at opening', rec: 'prep:att' });
     })();
     const prepChartRef = {};
     const page = { title: 'Preparedness', sub: '', isPrep: true, hasPrep: false, kpis: [
       k('Overall readiness', pct(avg), rep.length + ' of 17 parameters reported in ' + scopeName, BT[bandOf(avg)], 'prep'),
-      k('Reporting coverage', pct(repCells / totCells), fmtN(repCells) + ' of ' + fmtN(totCells) + (dn ? ' parameters' : ' district-parameter reports') + ' received', repCells / totCells >= 0.95 ? 'good' : 'warn', null, { def: 'How much of the expected preparedness reporting has arrived. Missing reports show as No data, never as zero.', calc: dn ? 'Parameters reported ÷ 17' : 'District-parameter reports received ÷ (28 districts × 17 parameters)', drill: 'Season → district → parameter', bars: (dn ? [] : D.map(function (d) { const r = idxAll.filter(function (i) { return !prepNA(d.name, i); }).length; return { name: d.name, r: r }; }).filter(function (x) { return x.r < 17; }).map(function (x) { return { label: x.name, w: Math.round(x.r / 17 * 100), v: x.r + ' / 17', c: '#E0AE4F' }; })), barsTitle: 'Districts with missing reports', rec: 'prep:na' }),
+      k('Reporting coverage', pct(repCells / totCells), fmtN(repCells) + ' of ' + fmtN(totCells) + (dn ? ' parameters' : ' district-parameter reports') + ' received', repCells / totCells >= 0.95 ? 'good' : 'warn', null, { def: 'How much of the expected preparedness reporting has arrived. Missing reports show as No data, never as zero.', calc: dn ? 'Parameters reported ÷ 17' : 'District-parameter reports received ÷ (28 districts × 17 parameters)', drill: 'Season → district → parameter', bars: (dn ? [] : scopeDistricts.map(function (d) { const r = idxAll.filter(function (i) { return !prepNA(d.name, i); }).length; return { name: d.name, r: r }; }).filter(function (x) { return x.r < 17; }).map(function (x) { return { label: x.name, w: Math.round(x.r / 17 * 100), v: x.r + ' / 17', c: '#E0AE4F' }; })), barsTitle: 'Districts with missing reports', rec: 'prep:na' }),
       k('Good', cnt.good + ' / 17', '70% and above', 'good', null, bandInfo('good', 'good')),
       k('Moderate', cnt.mod + ' / 17', '50–69%', cnt.mod ? 'warn' : 'good', null, bandInfo('mod', 'mod')),
       k('Needs attention', cnt.att + ' / 17', 'below 50%', cnt.att ? 'bad' : 'good', null, bandInfo('att', 'att')),
@@ -2104,7 +2105,7 @@ class Component extends DCLogic {
     const paramPop = function (i, d) { return function () {
       let rows;
       if (d) { const dx = dStat(i, d); rows = dx.x === null ? [] : mandalsOf(d).map(function (m) { const den = PDEN[PRM[i][4]](m.v); const x = Math.min(1, Math.max(0, dx.x + rr(m.id + 'pm' + i, -0.15, 0.1))); const bb = bandOf(x); return { name: m.name, cells: [C(fmtU(i, den * x)), C(fmtU(i, den)), C(pct(x), BTp[bb]), TXp(BL[bb], BTp[bb])], drill: sitesPop(i, d, m) }; }).sort(function (a, b) { return parseFloat(a.cells[2].v) - parseFloat(b.cells[2].v); }); }
-      else rows = D.map(function (dd) { const st = dStat(i, dd.name); const bb = bandOf(st.x); return { name: dd.name, cells: [C(st.x === null ? '—' : fmtU(i, st.num)), C(st.den === null ? '—' : fmtU(i, st.den)), C(st.x === null ? 'No data' : pct(st.x), BTp[bb]), TXp(BL[bb], BTp[bb])], drill: st.x === null ? null : paramPop(i, dd.name) }; });
+      else rows = scopeDistricts.map(function (dd) { const st = dStat(i, dd.name); const bb = bandOf(st.x); return { name: dd.name, cells: [C(st.x === null ? '—' : fmtU(i, st.num)), C(st.den === null ? '—' : fmtU(i, st.den)), C(st.x === null ? 'No data' : pct(st.x), BTp[bb]), TXp(BL[bb], BTp[bb])], drill: st.x === null ? null : paramPop(i, dd.name) }; });
       const st0 = d ? dStat(i, d) : stat(i); const b0 = bandOf(st0.x);
       self.tablePopup(pad(i + 1, 2) + ' · ' + PRM[i][0] + ' · ' + (d || 'Andhra Pradesh'), PRM[i][7] + (d ? (PRM[i][6] === 'mill' || PRM[i][6] === 'ppc' ? ' · click a mandal for its ' + (PRM[i][6] === 'mill' ? 'mills' : 'PPCs / RSKs') : ' · tracked at mandal level') : ' · click a district for its mandals'), [d ? 'Mandal' : 'District', 'Achieved', 'Out of', 'Readiness', 'Band'], rows, null, 'prep-' + pad(i + 1, 2), [], [{ k: 'Readiness', v: st0.x === null ? 'No data yet' : pct(st0.x) + ' · ' + BL[b0] }, { k: 'Measured as', v: PRM[i][2] + ' ÷ ' + PRM[i][3] }, { k: 'Owner', v: PRM[i][5] }, { k: 'Data freshness', v: st0.fresh || '—' }]);
     }; };
@@ -2116,7 +2117,7 @@ class Component extends DCLogic {
     /* overview */
     const riskIdx = rep.slice().sort(function (a, b) { return st17[a].x - st17[b].x; }).slice(0, 5);
     ui.topRisks = riskIdx.map(function (i) { const st = st17[i]; const b = bandOf(st.x); return { name: pad(i + 1, 2) + ' · ' + PRM[i][0], numden: fmtU(i, st.num) + ' of ' + fmtU(i, st.den), pctTxt: pct(st.x), bandCls: 'bchip ' + b, bandTxt: BL[b], fresh: st.fresh, tip: PRM[i][7], pick: paramPop(i, dn) }; });
-    const dList = (dn ? mandalsOf(dn).map(function (m) { return { name: m.name, a: Math.min(0.99, Math.max(0, (distAvg(dn) || 0) + rr(m.id + 'ma', -0.12, 0.08))), id: m.id }; }) : D.map(function (d) { return { name: d.name, a: distAvg(d.name) }; }));
+    const dList = (dn ? mandalsOf(dn).map(function (m) { return { name: m.name, a: Math.min(0.99, Math.max(0, (distAvg(dn) || 0) + rr(m.id + 'ma', -0.12, 0.08))), id: m.id }; }) : scopeDistricts.map(function (d) { return { name: d.name, a: distAvg(d.name) }; }));
     ui.attnTitle = dn ? 'Mandals needing attention · ' + dn : 'Districts needing attention';
     ui.distAttn = dList.slice().sort(function (a, b) { return (a.a === null ? 2 : a.a) - (b.a === null ? 2 : b.a); }).slice(0, 5).map(function (o) {
       const weak = dn ? null : idxAll.map(function (i) { return [i, dStat(i, o.name).x]; }).filter(function (x) { return x[1] !== null; }).sort(function (a, b) { return a[1] - b[1]; })[0];
@@ -2135,24 +2136,24 @@ class Component extends DCLogic {
       ui.rp = { scope: (dn ? dn : 'All districts') + ' · ' + seasL + ' · ' + (asc ? 'Low → High' : 'High → Low'), overall: ovA === null ? 'NA' : Math.round(ovA * 100) + '%', reporting: nrep + ' of ' + PRM.length + ' reporting', rows: rows,
         hiCls: asc ? 'rps' : 'rps on', loCls: asc ? 'rps on' : 'rps', hi: function () { self.setState({ rpSort: 'desc' }); }, lo: function () { self.setState({ rpSort: 'asc' }); } };
     }
-    ui.grid = idxAll.map(function (i) { const st = st17[i]; const b = bandOf(st.x); return { n: pad(i + 1, 2), name: PRM[i][0], numden: st.x === null ? 'No report received' : fmtU(i, st.num) + ' of ' + fmtU(i, st.den) + ' ' + PRM[i][3] + (!dn && st.rep < D.length ? ' (' + st.rep + ' of ' + D.length + ' districts reporting)' : ''), pctTxt: st.x === null ? 'No data' : pct(st.x), w: st.x === null ? 0 : Math.round(st.x * 100), c: BC[b], bandCls: 'bchip ' + b, bandTxt: BL[b], fresh: st.fresh, tip: PRM[i][7] + ' — Completion % = ' + PRM[i][2] + ' ÷ ' + PRM[i][3], extra: PEXTRA[i] ? PEXTRA[i](dn ? distVals(dn) : stateVals()) : '', hasExtra: !!PEXTRA[i], pick: paramPop(i, dn) }; });
+    ui.grid = idxAll.map(function (i) { const st = st17[i]; const b = bandOf(st.x); return { n: pad(i + 1, 2), name: PRM[i][0], numden: st.x === null ? 'No report received' : fmtU(i, st.num) + ' of ' + fmtU(i, st.den) + ' ' + PRM[i][3] + (!dn && st.rep < scopeDistricts.length ? ' (' + st.rep + ' of ' + scopeDistricts.length + ' districts reporting)' : ''), pctTxt: st.x === null ? 'No data' : pct(st.x), w: st.x === null ? 0 : Math.round(st.x * 100), c: BC[b], bandCls: 'bchip ' + b, bandTxt: BL[b], fresh: st.fresh, tip: PRM[i][7] + ' — Completion % = ' + PRM[i][2] + ' ÷ ' + PRM[i][3], extra: PEXTRA[i] ? PEXTRA[i](dn ? distVals(dn) : stateVals()) : '', hasExtra: !!PEXTRA[i], pick: paramPop(i, dn) }; });
 
     { /* readiness forecast: last three weeks, then at today's pace to the season opening and beyond */
       const open = new Date(2026, 9, 15); const days = Math.max(0, Math.ceil((open - new Date()) / 86400000)); const xEnd = Math.max(days + 21, 30);
-      const dl = dn ? [dn] : D.map(function (d) { return d.name; });
+      const dl = dn ? [dn] : scopeDistricts.map(function (d) { return d.name; });
       const cur = function (d) { return distAvg(d); }; const pace = function (d) { return rr(d + 'pace', 0.008, 0.016) * 0.6; };
       const at = function (d, t) { const a = cur(d); return a === null ? null : Math.max(0.05, Math.min(0.99, a + pace(d) * t)); };
       const avg = function (t) { const xs = dl.map(function (d) { return at(d, t); }).filter(function (x) { return x !== null; }); return xs.length ? xs.reduce(function (a, b) { return a + b; }, 0) / xs.length : 0; };
       const act = [], fc = [], band = [];
       for (let t = -21; t <= 0; t += 3) act.push([t, avg(t)]);
       for (let t = 0; t <= xEnd; t += 3) fc.push([t, avg(t)]);
-      if (!dn) for (let t = -21; t <= xEnd; t += 3) { const xs = D.map(function (d) { return at(d.name, t); }).filter(function (x) { return x !== null; }); band.push([t, Math.min.apply(null, xs), Math.max.apply(null, xs)]); }
+      if (!dn) for (let t = -21; t <= xEnd; t += 3) { const xs = scopeDistricts.map(function (d) { return at(d.name, t); }).filter(function (x) { return x !== null; }); band.push([t, Math.min.apply(null, xs), Math.max.apply(null, xs)]); }
       const atOpen = avg(days); const hit = (function () { for (let t = 0; t <= 120; t++) if (avg(t) >= 0.8) return t; return null; })();
       page.prepChart = this.lineChart({ title: 'Readiness forecast · ' + (dn || 'Andhra Pradesh'), sub: 'Overall readiness over the last three weeks and projected at today’s pace' + (dn ? '' : '; the shaded band is the range across districts'), series: [{ k: 'act', pts: act }, { k: 'fc', pts: fc }], band: band, hline: { y: 0.8, label: 'On track (80%)' }, yMin: 0, yMax: 1, yFmt: function (x) { return Math.round(x * 100) + '%'; }, vlines: [{ x: 0, label: 'Today' }, { x: days, label: 'Season opens' }], xTicks: [-21, -14, -7, 0, 7, 14, 21, 28, 35, 42].filter(function (t) { return t <= xEnd; }).map(function (t) { return { x: t, label: t === 0 ? 'Today' : (t > 0 ? '+' : '') + t + ' d' }; }), marks: [{ x: days, y: atOpen, label: pct(atOpen) + ' at opening', cls: 'fc' }], legend: [{ cls: 'lg-act', label: 'Readiness so far' }, { cls: 'lg-fc', label: 'Forecast at current pace' }].concat(dn ? [] : [{ cls: 'lg-band', label: 'Range across districts' }]), note: hit === null ? 'At the current pace readiness does not reach 80% within four months.' : hit <= days ? 'At the current pace readiness reaches 80% in ' + hit + ' days, before the season opens.' : 'At the current pace readiness reaches 80% in ' + hit + ' days, ' + (hit - days) + ' days after the season opens.' });
     }
     /* comparison matrix */
     const cmpCols = [{ label: 'District', cls: 'th first', tip: '' }, { label: 'Overall', cls: 'th', tip: 'Average of reported parameters' }].concat(idxAll.map(function (i) { return { label: pad(i + 1, 2) + ' ' + PRM[i][1], cls: 'th cmph' + (pSel === i ? ' sel' : ''), tip: PRM[i][0] }; }));
-    let cmpRows = D.map(function (d) { return { name: d.name, a: distAvg(d.name), cells: idxAll.map(function (i) { return dStat(i, d.name).x; }) }; });
+    let cmpRows = scopeDistricts.map(function (d) { return { name: d.name, a: distAvg(d.name), cells: idxAll.map(function (i) { return dStat(i, d.name).x; }) }; });
     cmpRows.sort(sorter(function (r) { return pSel >= 0 ? r.cells[pSel] : r.a; }));
     ui.cmp = { cols: cmpCols, grid: 'minmax(170px, 1.4fr) 76px repeat(17, minmax(72px, 1fr))', sortNote: 'Sorted by ' + (pSel >= 0 ? pad(pSel + 1, 2) + ' · ' + PRM[pSel][0] : 'overall readiness') + ', ' + (asc ? 'lowest' : 'highest') + ' first · click a district or a value for its details',
       rows: cmpRows.map(function (r, ri) { const b = bandOf(r.a); return { name: r.name, sel: dn === r.name, nameCls: 'td first' + (dn === r.name ? ' rsel' : ''), pick: distPop(r.name), overall: { v: r.a === null ? 'No data' : Math.round(r.a * 100) + '%', cls: 'td hc ' + b }, cells: r.cells.map(function (x, i) { const bb = bandOf(x); return { v: x === null ? 'NA' : Math.round(x * 100) + '%', cls: 'hcell ' + bb + (pSel === i ? ' sel' : ''), tip: r.name + ' · ' + PRM[i][0] + ': ' + (x === null ? 'No data yet' : pct(x) + ' (' + BL[bb] + ')'), pick: paramPop(i, r.name) }; }) }; }) };
@@ -2163,7 +2164,7 @@ class Component extends DCLogic {
       const BND = function (x) { return x === null ? 'na' : x >= 0.7 ? 'g' : x >= 0.5 ? 'm' : 'b'; };
       const seasL = (function () { const l = (s.seasons || []).filter(function (k) { return SEAS_NAME[k]; }); return l.length ? l.map(function (k) { return SEAS_NAME[k]; }).join(', ') : 'All seasons'; })();
       const rankBy = function (list, val) { const v = list.map(function (r) { return { n: r.name, x: val(r) }; }).filter(function (o) { return o.x !== null; }).sort(function (a, b) { return b.x - a.x; }); const m = {}; if (v.length && Math.abs(v[0].x - v[v.length - 1].x) < 1e-9) { v.forEach(function (o) { m[o.n] = '='; }); m._all = true; return m; } v.forEach(function (o, i) { m[o.n] = i > 0 && Math.abs(o.x - v[i - 1].x) < 1e-9 ? m[v[i - 1].n] : i + 1; }); m._n = v.length; return m; };
-      const out = D.map(function (d) { const st = idxAll.map(function (i) { return dStat(i, d.name); }); const xs = st.map(function (q) { return q.x; }).filter(function (x) { return x !== null; }); return { name: d.name, st: st, score: xs.length ? xs.reduce(function (a, b) { return a + b; }, 0) / xs.length : null, n: xs.length }; });
+      const out = scopeDistricts.map(function (d) { const st = idxAll.map(function (i) { return dStat(i, d.name); }); const xs = st.map(function (q) { return q.x; }).filter(function (x) { return x !== null; }); return { name: d.name, st: st, score: xs.length ? xs.reduce(function (a, b) { return a + b; }, 0) / xs.length : null, n: xs.length }; });
       const ranks = { score: rankBy(out, function (o) { return o.score; }) }; idxAll.forEach(function (i) { ranks[i] = rankBy(out, function (o) { return o.st[i].x; }); });
       const stateP = idxAll.map(function (i) { return prepStat(i, null); });
       const key = s.rkSort === undefined || s.rkSort === null ? 'score' : s.rkSort; const rk = ranks[key] || ranks.score;
@@ -2174,21 +2175,21 @@ class Component extends DCLogic {
       const profile = function (o) { return function () { const T = function (x, t) { return Object.assign(C(x, t || ''), { cls: 'txt' }); };
         self.tablePopup(o.name, 'Overall score ' + pcell(o.score) + ' · rank ' + (ranks.score[o.name] || '—') + ' of ' + N + ' · ' + seasL, ['Parameter', 'Achieved', 'Target', '%', 'Rank'], idxAll.map(function (i) { const q = o.st[i]; const r = ranks[i][o.name]; return { name: RFN[i], cells: [C(q.x === null ? '—' : fmtU(i, q.num)), C(q.x === null ? '—' : fmtU(i, q.den)), C(pcell(q.x), q.x === null ? '' : q.x >= 0.7 ? 'good' : q.x >= 0.5 ? 'warn' : 'bad'), C(r === '=' ? 'all equal' : r ? r + ' / ' + ranks[i]._n : '—')], drill: q.x === null ? null : paramPop(i, o.name) }; }), null, 'ranking-' + o.name); }; };
       const zero = idxAll.filter(function (i) { return stateP[i].x !== null && stateP[i].x < 0.005; }).map(function (i) { return RFN[i]; });
-      ui.rk = { eyebrow: seasL + ' · District ranking on all parameters', head: top ? top.name + ' leads overall at ' + (top.score * 100).toFixed(1) + '%; state average ' + (avg * 100).toFixed(1) + '%' : 'No district has reported yet',
+      ui.rk = { eyebrow: seasL + ' · District ranking on all parameters', head: top ? top.name + ' leads overall at ' + (top.score * 100).toFixed(1) + (isDM ? '%; district average ' : '%; state average ') + (avg * 100).toFixed(1) + '%' : 'No district has reported yet',
         sortedName: key === 'score' ? 'Overall score' : RFN[key],
-        kpis: [3, 4, 5, 6, 7, 12, 14].map(function (i) { return { v: pcell(stateP[i].x), l: RFN[i] + ' (state)' }; }),
+        kpis: [3, 4, 5, 6, 7, 12, 14].map(function (i) { return { v: pcell(stateP[i].x), l: RFN[i] + (isDM ? ' (district)' : ' (state)') }; }),
         cols: [{ label: 'Overall score', cls: 'rkth s3' + (key === 'score' ? ' sorted' : ''), tip: 'Rank by overall score', pick: function () { self.setState({ rkSort: 'score' }); } }].concat(idxAll.map(function (i) { return { label: RSH[i], cls: 'rkth' + (key === i ? ' sorted' : ''), tip: RFN[i] + ' — click to rank by this', pick: function () { self.setState({ rkSort: i }); } }; })),
         rows: list.map(function (o) { const rs = ranks.score[o.name]; return { rank: rk[o.name] === undefined ? '–' : rk[o.name], name: o.name + (o.n < PRM.length ? ' *' : ''), cls: 'rkrow' + (rs && rs <= 3 ? ' top' : rs && N && rs > N - 3 ? ' bot' : '') + (dn === o.name ? ' sel' : ''), score: o.score === null ? 'NA' : (o.score * 100).toFixed(1) + '%', srank: rs ? 'rank ' + rs : '', pick: profile(o),
           cells: idxAll.map(function (i) { const x = o.st[i].x; const r = ranks[i][o.name]; return { v: pcell(x), sub: r === '=' ? '= all' : r ? '#' + r : '—', cls: 'rkc ' + BND(x) }; }) }; }),
         state: { score: (avg * 100).toFixed(1) + '%', cells: idxAll.map(function (i) { return { v: pcell(stateP[i].x), cls: 'rkc ' + BND(stateP[i].x) }; }) },
-        note: 'Overall score = simple average of completion % across the parameters that have data; parameters a district has not reported (NA) are left out of its average (*). Ties share a rank. Top three rows are shaded blue, bottom three red. Colours: green ≥70% · amber 50–69% · red <50% · grey NA.' + (zero.length ? ' At 0% statewide: ' + zero.join(', ') + '.' : '') };
+        note: 'Overall score = simple average of completion % across the parameters that have data; parameters a district has not reported (NA) are left out of its average (*). Ties share a rank. Top three rows are shaded blue, bottom three red. Colours: green ≥70% · amber 50–69% · red <50% · grey NA.' + (zero.length ? (isDM ? ' At 0% in this district: ' : ' At 0% statewide: ') + zero.join(', ') + '.' : '') };
       const rkPick = (s.rkParams || []).filter(function (i) { return i >= 0 && i < PRM.length; });
       ui.rkSel = { open: !!s.rkOpen, label: rkPick.length ? rkPick.length + ' of ' + PRM.length + ' parameters' : 'All ' + PRM.length + ' parameters', toggle: function () { self.setState({ rkOpen: !self.state.rkOpen }); }, close: function () { self.setState({ rkOpen: false }); },
         all: function () { self.setState({ rkParams: [] }); }, hasChips: rkPick.length > 0, chips: rkPick.map(function (i) { return { label: RFN[i], rm: function () { self.setState({ rkParams: (self.state.rkParams || []).filter(function (x) { return x !== i; }) }); } }; }),
         opts: idxAll.map(function (i) { const on = rkPick.indexOf(i) >= 0; return { name: RFN[i], on: on, mark: on ? '✓' : '', cls: 'mso' + (on ? ' on' : ''), pick: function () { const l = (self.state.rkParams || []).slice(); const j = l.indexOf(i); if (j >= 0) l.splice(j, 1); else l.push(i); l.sort(function (a, b) { return a - b; }); self.setState({ rkParams: l }); } }; }) };
       ui.rkc = (rkPick.length ? rkPick : idxAll).map(function (i) { const r = ranks[i]; const rows = out.slice().sort(function (a, b) { const ra = r[a.name] === '=' ? 0 : r[a.name], rb = r[b.name] === '=' ? 0 : r[b.name]; if (ra === undefined && rb === undefined) return 0; if (ra === undefined) return 1; if (rb === undefined) return -1; return ra - rb; });
         const sp = stateP[i]; const has = rows.some(function (o) { return o.st[i].x !== null; });
-        return { title: RFN[i], state: 'State ' + pcell(sp.x) + (sp.x === null ? '' : ' · ' + fmtU(i, sp.num)), has: has, none: !has, pick: paramPop(i, null),
+        return { title: RFN[i], state: (isDM ? s.dm + ' ' : 'State ') + pcell(sp.x) + (sp.x === null ? '' : ' · ' + fmtU(i, sp.num)), has: has, none: !has, pick: paramPop(i, null),
           rows: rows.map(function (o) { const q = o.st[i]; const b = BND(q.x); return { rank: r[o.name] === '=' ? '=' : (r[o.name] || '–'), name: o.name, w: q.x === null ? 0 : Math.max(2, Math.round(q.x * 100)), bcls: 'rkbar ' + b, pct: pcell(q.x), num: q.x === null ? 'NA' : fmtU(i, q.num), pick: q.x === null ? function () {} : paramPop(i, o.name) }; }) }; });
     }
     const T3p = function (x, t) { return Object.assign(C(x, t || ''), { cls: 'txt' }); };
@@ -2217,14 +2218,14 @@ class Component extends DCLogic {
     ui.paramChips = idxAll.map(function (i) { return { label: pad(i + 1, 2) + ' · ' + PRM[i][0], pick: openParam(i, dn) }; });
     if (pSel >= 0) {
       const i = pSel; const st = stat(i); const b = bandOf(st.x);
-      ui.p = { title: pad(i + 1, 2) + ' · ' + PRM[i][0], def: PRM[i][7], numLabel: PRM[i][2], denLabel: PRM[i][3], owner: PRM[i][5], num: st.x === null ? 'No data' : fmtU(i, st.num), den: fmtU(i, st.den), pctTxt: st.x === null ? 'No data' : pct(st.x), bandCls: 'bchip ' + b, bandTxt: BL[b], fresh: st.fresh, extra: PEXTRA[i] ? PEXTRA[i](dn ? distVals(dn) : stateVals()) : '', hasExtra: !!PEXTRA[i], coverage: dn ? '' : st.rep + ' of ' + D.length + ' districts reported', formula: 'Completion % = ' + PRM[i][2] + ' ÷ ' + PRM[i][3] + ' × 100', equip: i === 8 ? 'Required set: moisture meter, analysis kit, husk remover, pokers, plates, sieve, sample bags, weighing scale' : '', hasEquip: i === 8 };
+      ui.p = { title: pad(i + 1, 2) + ' · ' + PRM[i][0], def: PRM[i][7], numLabel: PRM[i][2], denLabel: PRM[i][3], owner: PRM[i][5], num: st.x === null ? 'No data' : fmtU(i, st.num), den: fmtU(i, st.den), pctTxt: st.x === null ? 'No data' : pct(st.x), bandCls: 'bchip ' + b, bandTxt: BL[b], fresh: st.fresh, extra: PEXTRA[i] ? PEXTRA[i](dn ? distVals(dn) : stateVals()) : '', hasExtra: !!PEXTRA[i], coverage: dn ? '' : st.rep + ' of ' + scopeDistricts.length + ' districts reported', formula: 'Completion % = ' + PRM[i][2] + ' ÷ ' + PRM[i][3] + ' × 100', equip: i === 8 ? 'Required set: moisture meter, analysis kit, husk remover, pokers, plates, sieve, sample bags, weighing scale' : '', hasEquip: i === 8 };
       ui.p.facts = [{ k: 'Numerator · ' + ui.p.numLabel, v: ui.p.num }, { k: 'Denominator · ' + ui.p.denLabel, v: ui.p.den }, { k: 'Completion', v: ui.p.pctTxt }, { k: 'Data freshness', v: ui.p.fresh }, { k: 'Owner', v: ui.p.owner }].concat(ui.p.coverage ? [{ k: 'Reporting', v: ui.p.coverage }] : []);
       const unitType = PRM[i][6]; const mid = s.prepMandal;
       let labels, rows, lvl;
       if (!dn) {
         lvl = 'District comparison';
         labels = ['District', PRM[i][2], PRM[i][3], 'Completion', 'Band', 'Data freshness'];
-        rows = D.map(function (d) { return { d: d.name, st: dStat(i, d.name) }; }).sort(sorter(function (o) { return o.st.x; })).map(function (o) { const bb = bandOf(o.st.x); return { name: o.d, cells: [C(o.st.x === null ? '—' : fmtU(i, o.st.num)), C(fmtU(i, o.st.den)), C(o.st.x === null ? 'No data' : pct(o.st.x), BT[bb]), Object.assign(C(BL[bb], BT[bb]), { cls: 'txt' }), Object.assign(C(o.st.fresh, o.st.stale ? 'warn' : ''), { cls: 'txt' })], drill: o.st.x === null ? null : paramPop(i, o.d) }; });
+        rows = scopeDistricts.map(function (d) { return { d: d.name, st: dStat(i, d.name) }; }).sort(sorter(function (o) { return o.st.x; })).map(function (o) { const bb = bandOf(o.st.x); return { name: o.d, cells: [C(o.st.x === null ? '—' : fmtU(i, o.st.num)), C(fmtU(i, o.st.den)), C(o.st.x === null ? 'No data' : pct(o.st.x), BT[bb]), Object.assign(C(BL[bb], BT[bb]), { cls: 'txt' }), Object.assign(C(o.st.fresh, o.st.stale ? 'warn' : ''), { cls: 'txt' })], drill: o.st.x === null ? null : paramPop(i, o.d) }; });
       } else if (!mid || unitType === 'none') {
         lvl = 'Mandal comparison · ' + dn;
         const dst = dStat(i, dn);
@@ -2246,7 +2247,7 @@ class Component extends DCLogic {
     ui.rptBtns = [['dist', 'District-wise'], ['rsk', 'RSK-wise'], ['mill', 'Mill-wise']].map(function (b) { const on = rpt === b[0]; return { label: b[1], on: on, cls: on ? 'on' : '', pick: function () { self.setState({ prepRpt: b[0] }); } }; });
     ui.rptNeedDist = rpt !== 'dist' && !dn;
     if (rpt === 'dist') {
-      let rs = D.map(function (d) { const a = distAvg(d.name); const c2 = { good: 0, mod: 0, att: 0, na: 0 }; idxAll.forEach(function (i) { c2[bandOf(dStat(i, d.name).x)]++; }); return { d: d.name, a: a, c: c2 }; });
+      let rs = scopeDistricts.map(function (d) { const a = distAvg(d.name); const c2 = { good: 0, mod: 0, att: 0, na: 0 }; idxAll.forEach(function (i) { c2[bandOf(dStat(i, d.name).x)]++; }); return { d: d.name, a: a, c: c2 }; });
       rs.sort(sorter(function (r) { return r.a; }));
       ui.rpt = this.table('District-wise preparedness report', 'All 28 districts · ' + (asc ? 'lowest' : 'highest') + ' readiness first · export opens in Excel', ['District', 'Overall readiness', 'Good', 'Moderate', 'Needs attention', 'No data yet'].concat(idxAll.map(function (i) { return pad(i + 1, 2) + ' ' + PRM[i][1]; })), rs.map(function (r) { return { name: r.d, cells: [C(r.a === null ? 'No data' : pct(r.a), BT[bandOf(r.a)]), C(r.c.good), C(r.c.mod), C(r.c.att, r.c.att ? 'bad' : ''), C(r.c.na, r.c.na ? 'warn' : '')].concat(idxAll.map(function (i) { const x = dStat(i, r.d).x; return C(x === null ? 'NA' : pct(x), BT[bandOf(x)]); })), drill: distParamsPop(r.d) }; }), null, null, 'preparedness-district-wise');
     } else if (dn) {
@@ -2311,7 +2312,7 @@ class Component extends DCLogic {
     const vm = valsOn.length ? valsOn : [meas[0]];
     /* records after the dashboard filters above */
     let base = ds === 'inc' ? incFacts() : PVX[ds] ? PVX[ds].facts() : procFacts();
-    const gD = s.pvDist || this.curPath()[0] || null; const notes = [];
+    const gD = s.role === 'dm' ? s.dm : s.pvDist || this.curPath()[0] || null; const notes = [];
     if (gD) { base = base.filter(function (r) { return r.District === gD; }); notes.push(gD); }
     if (ds === 'inc' && s.stage !== 'all' && CATN[s.stage]) { base = base.filter(function (r) { return r.Category === CATN[s.stage]; }); notes.push(CATN[s.stage]); }
     let recs = base;
