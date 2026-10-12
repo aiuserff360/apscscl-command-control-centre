@@ -393,7 +393,8 @@ window.Pages = (function () {
     return '<div class="tools">' + U.seg(ch.lensBtns) + '<span class="small muted">Break each step by</span>' + U.seg(ch.splBtns) + '<span class="note" style="margin:0 0 0 auto">' + esc(ch.count) + '</span></div>' + steps + off + (ch.empty ? U.empty(ch.emptyTxt) : '') + (step ? '<div style="margin-top:10px">' + step + '</div>' : '');
   };
   const incidents = function (vm) {
-    const p = vm.page;
+    // Incident links may carry a district/record path; the work queue uses the root model.
+    const p = (E.L.state.path || []).length ? E.peek({module: 'alerts', stage: E.L.state.stage, path: [], pivot: false}).page : vm.page;
     const home = E.peek({ module: 'overview', stage: 'all', pivot: false, kpiOpen: null });
     const body = '<div class="hero">' + U.tiles(p.kpis, { cls: 'four' }) + '</div>' +
       (home && home.page.queue ? card(sh('Incident work queue', home.page.queue.note) + queueBlock(home.page.queue, { max: 10 })) : '') +

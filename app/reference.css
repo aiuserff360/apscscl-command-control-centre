@@ -91,8 +91,7 @@ button:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visi
 .ref-stage-head b {font-size:12px;color:#153758;display:block;line-height:1.15;}
 .ref-stage-head small {font-size:10px;color:#324e68;display:block;margin-top:3px;line-height:1.1;}
 .ref-stage-head .dot {width:9px;height:9px;flex:none;margin:0;}
-.stage-photo {display:block;height:48px;background-size:cover;background-position:center;}
-.photo-0 {background-image:url('../assets/stage-1.jpg');}.photo-1 {background-image:url('../assets/stage-2.jpg');}.photo-2 {background-image:url('../assets/stage-3.jpg');}.photo-3 {background-image:url('../assets/stage-4.jpg');}.photo-4 {background-image:url('../assets/stage-5.jpg');}.photo-5 {background-image:url('../assets/stage-6.jpg');}
+.stage-photo {display:block;width:100%;height:auto;aspect-ratio:3/1;object-fit:contain;background:#eef2ea;}
 .ref-stage>strong {font-size:clamp(14px,1.15vw,19px);line-height:1.2;color:#092d80;text-align:center;padding:7px 3px 0;letter-spacing:-.3px;overflow-wrap:anywhere;}
 .ref-stage>small {font-size:11px;color:#506888;text-align:center;padding:2px 4px 6px;}
 .ref-stage-rows {display:flex;flex-direction:column;gap:0;padding:3px 8px 7px;}
@@ -237,3 +236,26 @@ button:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visi
 .filterbar .f {min-width:150px;}
 @media(max-width:1199px){.tagline{display:none;}}
 @media(max-width:860px){.government-brand{display:none;}.nav .foot{display:none;}}
+
+/* Incident brief and progressively disclosed case evidence. */
+.incident-brief {padding:16px;background:var(--good-bg,#edf6ef);border:1px solid var(--line);border-radius:10px;}
+.incident-brief h3,.case-file h3 {margin:0 0 10px;font-size:15px;}
+.incident-brief dl,.case-rows {margin:0;display:grid;gap:12px;}
+.incident-brief dt,.case-rows dt {font-size:11px;color:var(--muted);font-weight:700;margin-bottom:4px;}
+.incident-brief dd,.case-rows dd {margin:0;font-size:13px;line-height:1.55;overflow-wrap:anywhere;}
+.incident-brief .note {margin:12px 0 0;}
+.case-file > .note {margin:0 0 10px;}
+.case-file .layer {margin-bottom:7px;}
+.case-file summary.lh {cursor:pointer;list-style:none;min-height:44px;}
+.case-file summary.lh::-webkit-details-marker {display:none;}
+.case-file summary.lh::after {content:'+';margin-left:auto;font-size:18px;}
+.case-file details[open] > summary.lh::after {content:'−';}
+.case-file summary.lh:focus-visible {outline:2px solid var(--good);outline-offset:2px;}
+.case-file .lb {padding:6px 14px 14px;}
+.case-rows > div {border-top:1px solid var(--line);padding-top:10px;}
+.case-rows .tools {margin-top:8px;}
+.drawer .dh {flex-wrap:wrap;gap:10px;}
+.drawer .dh > :first-child {min-width:0;flex:1 1 260px;}
+.drawer .dh .dr {flex-wrap:wrap;}
+@media(max-width:600px){.case-file .ls{display:none;}.drawer .dh .dr{flex-basis:100%;}}
+@media(max-width:480px){.ref-chain.with-photos{grid-template-columns:repeat(2,minmax(0,1fr));}.ref-stage-head{overflow-wrap:normal;word-break:normal;}}
