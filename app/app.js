@@ -221,11 +221,7 @@ window.App = (function () {
   };
   const chatDrawer = function (vm) {
     if (!vm.chatOpen) return '';
-    const body = '<div class="chat">' + vm.chatMsgs.map(function (m) { return '<div class="msg' + (m.cls === 'me' ? ' me' : '') + '">' + esc(m.text) + (m.hasBars ? '<div class="mb">' + U.bars(m.bars) + '</div>' : '') + (m.hasAct ? '<div class="mb">' + U.btn(m.actLabel, m.act, 'xs') + '</div>' : '') + '</div>'; }).join('') + '</div>' +
-      '<div>' + U.link(vm.sugLabel, vm.toggleSugs) + (vm.sugHidden ? '' : U.chips(vm.chatSugs.map(function (s) { return { label: s.text, pick: s.ask }; }))) + '</div>' +
-      '<form class="askbar"' + on(function (e) { e.preventDefault(); vm.onChatSubmit(e); }, 'submit') + '><input placeholder="Ask in English or తెలుగు…" value="' + esc(vm.chatInput) + '"' + on(vm.onChatInput, 'input') + ' data-fkey="chatq">' + U.btn('Send', function (e) { vm.onChatSubmit(e); }, 'primary') + '</form>' +
-      '<div class="tools">' + U.btn('Open Intelligence', vm.goAsk, 'xs ghost', 'brain') + '</div>';
-    return drawerShell('Ask Assistant', esc(vm.roleTitle), body, '', vm.closeChat, 'narrow');
+    return drawerShell('Ask the dashboard', esc(window.DashboardChat.context().name), window.DashboardChat.body(), '', vm.closeChat, 'narrow');
   };
   const modal = function (vm) {
     if (!vm.hasModal) return ''; const m = vm.modal;
@@ -247,7 +243,7 @@ window.App = (function () {
     const sb = vm.sBanner.on ? '<div class="sbanner"><b>' + esc(vm.sBanner.title) + '</b><span>' + esc(vm.sBanner.desc) + '</span>' + U.btn('Show all seasons', vm.sBanner.clear, 'xs ghost') + '</div>' : '';
     const sEmpty = vm.sEmpty.on ? '<div class="card" style="margin-bottom:12px"><h3>' + esc(vm.sEmpty.title) + '</h3><p class="small">' + esc(vm.sEmpty.text) + '</p>' + (vm.sEmpty.hasAlt ? U.btn(vm.sEmpty.altLabel, vm.sEmpty.alt, 'sm') : '') + '</div>' : '';
     const main = filterbar(vm) + crumbs(vm) + head + sb + sEmpty + (railHtml ? '<div class="withrail"><div class="stack">' + pg.body + '</div><aside class="rail">' + railHtml + '</aside></div>' : '<div class="stack">' + pg.body + '</div>');
-    const html = banner(vm) + '<div class="frame">' + nav(vm) + '<main class="main view-' + S.section + '">' + main + '</main></div>' + kinfoDrawer(vm) + rxDrawer(vm) + actDrawer(vm) + chatDrawer(vm) + modal(vm);
+    const html = banner(vm) + '<div class="frame">' + nav(vm) + '<main class="main view-' + S.section + '">' + main + '</main></div>' + kinfoDrawer(vm) + rxDrawer(vm) + actDrawer(vm) + chatDrawer(vm) + modal(vm) + (!vm.chatOpen ? '<button class="dashboard-chat-launcher" aria-label="Open dashboard chat"' + on(vm.openChat) + '>' + icon('ask') + ' Ask the dashboard</button>' : '');
     const y = window.scrollY; const ae = document.activeElement; const fkey = ae && ae.dataset ? ae.dataset.fkey : null; let selPos = null; try { selPos = ae && ae.selectionStart; } catch (e) {}
     root.innerHTML = html;
     if (S.scrollTop) { window.scrollTo(0, 0); S.scrollTop = false; } else window.scrollTo(0, y);

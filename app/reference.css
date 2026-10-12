@@ -313,3 +313,8 @@ button:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visi
 .indicator-card>.btn{align-self:flex-start;text-align:left;white-space:normal;line-height:1.6;margin-top:9px;padding-left:0;}
 @media(max-width:600px){.indicator-grid{grid-template-columns:1fr;}.indicator-card{padding:16px;}.indicator-reading strong{font-size:26px;}.indicator-card h4{font-size:16px;}.intuitive-indicators .sh{flex-wrap:wrap;}.indicator-status{font-size:12px;}}
 .indicator-section-note{font-size:12px;color:#536b76;line-height:1.7;margin:0 0 16px;}
+
+/* Small chat entry point; dashboard composition remains unchanged. */
+.dashboard-chat-launcher{position:fixed;right:22px;bottom:22px;z-index:40;display:flex;align-items:center;gap:8px;background:var(--green-700,#145443);color:white;border:1px solid #386c57;border-radius:24px;padding:12px 17px;font:600 12px system-ui;box-shadow:0 4px 18px #153e3526;cursor:pointer;}
+.chat-scope{padding:12px;background:#eff5f0;border:1px solid var(--line);border-radius:8px;margin-bottom:14px;}.chat-scope small{display:block;margin-top:5px;color:var(--ink-3);font-size:11px;}
+.preloaded-questions{display:grid;gap:7px;margin:18px 0;}.preloaded-questions button{text-align:left;white-space:normal;justify-content:flex-start;}@media(max-width:600px){.dashboard-chat-launcher{right:12px;bottom:12px;}}
