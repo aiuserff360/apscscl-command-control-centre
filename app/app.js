@@ -76,7 +76,7 @@ window.App = (function () {
   };
   const setStage = function (k) { S.stage = k; if (S.section === 'chain' && S.sub === 'entities') S.sub = ''; applyNav(); E.invalidate(); };
   const setSub = function (sub) { S.sub = sub; applyNav(); E.invalidate(); };
-  const openLens = function (section) { const dn = (E.L.state.path || [])[0]; S.section = section; S.stage = 'all'; S.sub = ''; S.scrollTop = true; S.push = true; E.set({ path: dn ? [dn] : basePath() }); applyNav(); E.invalidate(); };
+  const openLens = function (section, sub) { const dn = (E.L.state.path || [])[0]; S.section = section; S.stage = 'all'; S.sub = sub || ''; S.scrollTop = true; S.push = true; E.set({ path: dn ? [dn] : basePath() }); applyNav(); E.invalidate(); };
   const openDistrict = function (name) { S.section = 'districts'; S.stage = 'all'; S.sub = ''; S.scrollTop = true; E.set({ path: [name] }); applyNav(); E.invalidate(); };
 
   /* ---------- hash routing ---------- */
@@ -192,7 +192,7 @@ window.App = (function () {
     const lk = function (l) { return l.isHref ? '<a class="btn sm" href="' + esc(l.href || '#') + '" target="_blank" rel="noopener">' + esc(l.label) + '</a>' : U.btn(l.label, l.go || l.pick || l.open, 'sm'); };
     const body =
       (r.incId ? IncidentUI.brief(r) : '') +
-      (r.hasAi ? '<div class="aibox"><b>' + esc(r.aiLabel || 'AI summary') + '</b>' + esc(r.ai) + (r.aiSrc ? '<div class="note">' + esc(r.aiSrc) + '</div>' : '') + '</div>' : '') +
+      (r.hasAi ? IncidentUI.summary(r) : '') +
       (r.hasFacts ? U.facts(r.facts.map(f => ({...f, v: String(f.v).replace(/^1 hours$/, '1 hour')}))) : '') +
       (r.hasImg ? '<img src="' + esc(r.img) + '" alt="" style="max-width:100%;border-radius:8px">' + (r.imgDur ? '<div class="note">' + esc(r.imgDur) + '</div>' : '') : '') +
       (r.hasPg ? '<div><img src="' + r.pgImg + '" alt="" style="max-width:100%;border:1px solid var(--line);border-radius:8px"><div class="note">' + esc(r.pgTag) + '</div></div>' : '') +
@@ -215,9 +215,9 @@ window.App = (function () {
     let body = '<div class="note">' + esc(a.where) + '</div>' + (a.hasCtx ? U.facts(a.ctxFacts, 'inline') : '');
     if (a.isDone) body += '<div class="done"><b>' + esc(a.doneTitle) + '</b><p>' + esc(a.doneText) + '</p><div class="tools" style="margin-top:8px">' + U.btn('Undo', a.undo, 'sm ghost') + U.btn('Open decision log', a.toLog, 'sm') + '</div></div>';
     else if (a.hasEsc) body += '<div class="form card flat"><b>Escalate to ' + esc(a.escTo) + '</b><div class="small muted">Action to put forward</div>' + a.escSugs.map(function (s) { return '<label class="small"><input type="radio" name="escsug"' + (/on/.test(s.cls) ? ' checked' : '') + on(s.pick, 'change') + '> ' + esc(s.label) + '</label>'; }).join('') + '<label>Remarks<textarea' + on(a.escOn.remarks, 'input') + ' data-fkey="escrem">' + esc(a.esc.remarks) + '</textarea></label><div class="grid"><label class="c4">Priority<select' + on(a.escOn.prio, 'change') + '>' + ['Normal', 'High', 'Urgent'].map(function (p) { return '<option' + (a.esc.prio === p ? ' selected' : '') + '>' + p + '</option>'; }).join('') + '</select></label><label class="c4">Respond by<input type="date" value="' + esc(a.esc.due) + '"' + on(a.escOn.due, 'change') + '></label><label class="c4">Copy to<input value="' + esc(a.esc.cc) + '"' + on(a.escOn.cc, 'input') + ' data-fkey="esccc"></label></div><div class="tools">' + U.btn('Send', a.escSend, 'sm primary') + U.btn('Cancel', a.escCancel, 'sm ghost') + '</div></div>';
-    else body += '<div class="stack" style="gap:8px">' + a.sugs.map(function (s) { return '<div class="sug' + (/main/.test(s.cls) ? ' main' : '') + '"><div class="rank">' + esc(s.rank) + '</div><div class="act">' + esc(s.act) + '</div><div class="meta"><span>Owner: ' + esc(s.owner) + '</span><span>By: ' + esc(s.by) + '</span><span>Expected: ' + esc(s.effect) + '</span></div><button class="lnk"' + on(s.toggleWhy) + '>' + esc(s.whyLabel) + '</button>' + (s.whyOpen ? '<ul class="why">' + s.why.map(function (w) { return '<li>' + esc(w.t) + '</li>'; }).join('') + '</ul>' : '') + (s.canDecide ? '<div class="tools" style="margin-top:8px">' + U.btn('Decide', s.decide, 'sm primary') + '</div>' : '') + '</div>'; }).join('') + '</div>' +
+    else body += '<div class="stack" style="gap:8px">' + a.sugs.map(function (s) { return '<div class="sug' + (/main/.test(s.cls) ? ' main' : '') + '"><div class="rank">' + esc(s.rank) + '</div><div class="act">' + esc(s.act) + '</div><div class="meta"><span>Responsible office: ' + esc(s.owner) + '</span><span>Response deadline: ' + esc(String(s.by).replace(/(\d+) h\b/g, '$1 hours')) + '</span><span>Expected result: ' + esc(s.effect) + '</span></div><button class="lnk"' + on(s.toggleWhy) + '>' + esc(s.whyLabel) + '</button>' + (s.whyOpen ? '<ul class="why">' + s.why.map(function (w) { return '<li>' + esc(w.t) + '</li>'; }).join('') + '</ul>' : '') + (s.canDecide ? '<div class="tools" style="margin-top:8px">' + U.btn('Record this decision', s.decide, 'sm primary') + '</div>' : '') + '</div>'; }).join('') + '</div>' +
       '<div class="tools">' + (a.canEscDM ? U.btn('Escalate to ' + a.dmLabel, a.escDM, 'sm') : '') + U.btn('Escalate to Head office', a.escHO, 'sm') + U.btn('Remind me later', a.later, 'sm ghost') + '</div>';
-    return drawerShell('Act · ' + esc(a.title), '', body, '', a.close, 'narrow');
+    return drawerShell('Review intervention · ' + esc(a.title), '', body, '', a.close, 'narrow');
   };
   const chatDrawer = function (vm) {
     if (!vm.chatOpen) return '';

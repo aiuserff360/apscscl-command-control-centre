@@ -87,14 +87,30 @@ window.UI = (function () {
   const tiles = function (list, opts) { opts = opts || {}; return '<div class="tiles ' + (opts.cls || '') + '">' + (list || []).map(function (k, i) { return tile(k, { icon: opts.icons ? opts.icons[i] : null }); }).join('') + '</div>'; };
 
   /* ---- KPI table (framework scorecard list) ---- */
+  // Indicator cards retain every source value and callback without forcing a wide table on small screens.
+  const indicatorText = value => { const text = String(value == null ? '' : value)
+    .replace(/\bAvg\b/g, 'Average').replace(/\bSLA\b/g, 'the prescribed service time')
+    .replace(/\bGLT\b/g, 'Gunny, labour and transport').replace(/\bPPCs\b/g, 'procurement centres').replace(/\bPPC\b/g, 'procurement centre')
+    .replace(/\bRSKs\b/g, 'procurement centres').replace(/\bRSK\b/g, 'procurement centre')
+    .replace(/\be-BG\b/g, 'electronic bank guarantee').replace(/\bCMR\b/g, 'custom milled rice')
+    .replace(/\bLMT\b/g, 'lakh metric tonnes').replace(/\bMT\b/g, 'metric tonnes').replace(/\bCr\b/g, 'crore')
+    .replace(/\bpts\b/g, 'percentage points').replace(/(\d+) h\b/g, '$1 hours').replace(/\bQR\b/g, 'quick response code')
+    .replace(/\bKPIs\b/g, 'performance indicators').replace(/\bKPI list\b/g, 'performance indicators');
+    return text.charAt(0).toUpperCase()+text.slice(1);
+  };
   const kpiTable = function (sec, opts) {
     opts = opts || {};
     const items = sec.items || [];
-    const inner = (opts.bare ? '' : sectionHead(opts.title || sec.title, sec.sub, opts.right || '')) +
-      '<table class="kt"><thead><tr><th>KPI</th><th class="r">Actual</th><th class="r">Target</th><th class="r">Variance</th><th>Status</th><th>Freshness</th></tr></thead><tbody>' +
-      items.map(function (it) { const t = toneOf(it.vcls); return '<tr class="row"' + on(it.info) + '><td><div class="kn"><span class="kno">' + esc(it.n) + '</span><b>' + esc(it.name) + '</b></div><div class="kd">' + esc(it.detail) + '</div></td><td class="r v ' + t + '">' + esc(it.value) + '</td><td class="r">' + esc(it.target || '—') + '</td><td class="r ' + toneOf(it.varCls) + '">' + esc(it.variance || '—') + '</td><td>' + status(t) + '</td><td class="muted small">' + esc(it.tag === 'Proposed' ? 'Proposed' : it.fresh) + '</td></tr>'; }).join('') +
-      '</tbody></table>';
-    return opts.bare ? '<div class="kpitable">' + inner + '</div>' : card(inner, 'kpitable ' + (opts.cls || ''));
+    const title = indicatorText(opts.title || sec.title);
+    const body = '<div class="indicator-grid">' + items.map(function (it) {
+      const t = toneOf(it.vcls), word = {good:'On track',warn:'Needs monitoring',bad:'Requires attention','':'Status not assigned'}[t];
+      const exists = value => value != null && String(value).trim() !== '' && String(value).trim() !== '—';
+      const target = exists(it.target), variance = exists(it.variance);
+      const provenance = it.tag === 'Illustrative' ? 'Illustrative data' : it.tag === 'Reported' ? 'Reported data' : it.tag === 'Proposed' ? 'Proposed indicator' : (it.tag || 'Source classification not supplied');
+      return '<article class="indicator-card '+t+'"><div class="indicator-top"><span class="indicator-reference">'+esc(String(it.n || '').replace(/^KPI\b/, 'Key performance indicator'))+'</span><span class="indicator-status '+t+'">'+dot(t)+esc(word)+'</span></div><h4>'+esc(indicatorText(it.name))+'</h4><div class="indicator-reading"><span>'+(/District target achievement/i.test(it.name)?'Achievement range across districts':'Current result')+'</span><strong>'+esc(indicatorText(it.value))+'</strong></div>'+(it.detail ? '<p class="indicator-context">'+esc(indicatorText(it.detail))+'</p>' : '')+(target || variance ? '<dl class="indicator-comparison">'+(target?'<div><dt>Target</dt><dd>'+esc(indicatorText(it.target))+'</dd></div>':'')+(variance?'<div><dt>Difference from target</dt><dd class="'+toneOf(it.varCls)+'">'+esc(indicatorText(it.variance))+'</dd></div>':'')+'</dl>':'')+'<div class="indicator-provenance"><span>'+esc(provenance)+'</span><span>'+esc(it.fresh || 'Update time not supplied')+'</span></div>'+ (typeof it.info === 'function' ? btn('View definition and supporting records',it.info,'xs ghost') : '<span class="note">Supporting records are not available.</span>')+'</article>';
+    }).join('')+'</div>';
+    const inner = (opts.bare ? '' : sectionHead(title, indicatorText(sec.sub), opts.right || '')) + '<p class="indicator-section-note">'+items.length+' indicators. Targets and differences are displayed where the source supplies them. Open an indicator to review its definition and supporting records.</p>' + body;
+    return opts.bare ? '<div class="kpitable intuitive-indicators">'+inner+'</div>' : card(inner,'kpitable intuitive-indicators '+(opts.cls || ''));
   };
 
   /* ---- generic data table from the baseline table view-model ---- */
