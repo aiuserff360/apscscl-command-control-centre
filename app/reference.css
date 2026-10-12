@@ -318,3 +318,15 @@ button:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visi
 .dashboard-chat-launcher{position:fixed;right:22px;bottom:22px;z-index:40;display:flex;align-items:center;gap:8px;background:var(--green-700,#145443);color:white;border:1px solid #386c57;border-radius:24px;padding:12px 17px;font:600 12px system-ui;box-shadow:0 4px 18px #153e3526;cursor:pointer;}
 .chat-scope{padding:12px;background:#eff5f0;border:1px solid var(--line);border-radius:8px;margin-bottom:14px;}.chat-scope small{display:block;margin-top:5px;color:var(--ink-3);font-size:11px;}
 .preloaded-questions{display:grid;gap:7px;margin:18px 0;}.preloaded-questions button{text-align:left;white-space:normal;justify-content:flex-start;}@media(max-width:600px){.dashboard-chat-launcher{right:12px;bottom:12px;}}
+
+/* Incident flow: readable counts and full labels at every viewport width. */
+.chainmx{grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;}
+.chainmx .chs,.chain-support{display:flex;flex-direction:column;gap:9px;text-align:left;min-width:0;width:100%;padding:14px;font:inherit;color:var(--ink);white-space:normal;}
+.chainmx .chs .nm{font-size:14px;line-height:1.4;overflow-wrap:normal;word-break:normal;}
+.chain-count{display:flex;flex-direction:column;gap:2px;font-size:12px;color:var(--ink-3);}.chain-count b{font-size:23px;line-height:1.25;color:var(--ink);}
+.chain-facts{display:flex;flex-direction:column;gap:5px;border-top:1px solid var(--line);padding-top:9px;font-size:12px;}
+.chain-support .nm{font-size:14px;line-height:1.4;}.chain-support .small{line-height:1.5;}.chain-support .v{font-size:17px;}
+@media(max-width:700px){.chainmx,.withrail .chainmx{grid-template-columns:repeat(2,minmax(0,1fr));}.flow,.withrail .flow{grid-template-columns:repeat(2,minmax(0,1fr));}.ins{grid-template-columns:repeat(2,minmax(0,1fr));}.main{padding-bottom:85px;}.dashboard-chat-launcher{font-size:11px;padding:10px 13px;}}
+@media(max-width:430px){.chainmx,.withrail .chainmx{grid-template-columns:1fr;}}
+
+.chain-explanation{font-size:12px;line-height:1.55;color:var(--ink-3);}.chainmx .chs{justify-content:flex-start;}.chainmx .chain-count{margin-top:auto;}.chainmx{grid-template-columns:repeat(auto-fit,minmax(245px,1fr));}@media(max-width:700px){.chainmx,.withrail .chainmx{grid-template-columns:1fr;}}
