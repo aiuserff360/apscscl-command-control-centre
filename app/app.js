@@ -237,6 +237,9 @@ window.App = (function () {
   const render = function () {
     if (!E.ready) return;
     E.resetFns(); sync();
+    const incidentPath = E.L.state.path || [];
+    const selectedIncident = E.L.state.module === 'alerts' && TX[incidentPath[incidentPath.length - 1]];
+    if (selectedIncident) E.set({rxRec: E.L.incRec(selectedIncident), path: incidentPath.slice(0, -1)});
     const vm = E.render();
     const pg = page(vm);
     const railHtml = S.rail && pg.rail ? pg.rail : '';
