@@ -12,9 +12,9 @@ window.UI = (function () {
   const statusWord = { good: 'On track', warn: 'Watch', bad: 'Act now', '': '—' };
   const STAGE_META = {
     proc: { num: '01', label: 'Procurement', short: 'Procurement', color: 'var(--st-proc)', icon: 'sprout' },
-    cmr: { num: '02', label: 'CMR', short: 'CMR · milling', color: 'var(--st-cmr)', icon: 'mill' },
-    s1: { num: '03', label: 'Stage 1', short: 'Stage 1 · godown → MLS', color: 'var(--st-s1)', icon: 'truck' },
-    s2: { num: '04', label: 'Stage 2', short: 'Stage 2 · MLS → FPS', color: 'var(--st-s2)', icon: 'shop' },
+    cmr: { num: '02', label: 'Processing (CMR)', short: 'CMR · milling', color: 'var(--st-cmr)', icon: 'mill' },
+    s1: { num: '03', label: 'Transportation (Stage-I)', short: 'Stage-I · godown → MLS', color: 'var(--st-s1)', icon: 'truck' },
+    s2: { num: '04', label: 'Distribution (Stage-II)', short: 'Stage-II · MLS → FPS', color: 'var(--st-s2)', icon: 'shop' },
     stor: { num: '05', label: 'Storage', short: 'Storage · godowns', color: 'var(--st-stor)', icon: 'warehouse' }
   };
   const ICONS = {
@@ -78,7 +78,7 @@ window.UI = (function () {
     const pctM = String(k.value).match(/^(-?\d+(?:\.\d+)?)%$/);
     const w = pctM ? Math.max(2, Math.min(100, Math.round(parseFloat(pctM[1])))) : null;
     return '<button class="tile ' + (opts.cls || '') + (k.open ? ' open' : '') + '"' + on(k.info) + ' title="' + esc((k.rep ? 'Reported figure · ' : '') + (k._info && k._info.def || '')) + '">' +
-      '<div class="tl">' + (opts.icon ? icon(opts.icon, 'tic') : '') + '<span class="tlab">' + esc(k.label) + '</span></div>' +
+      '<div class="tl">' + (opts.icon ? icon(opts.icon, 'tic') : '') + '<span class="tlab">' + esc(({ 'Procurement target achieved': 'Paddy procurement · target achieved', 'CMR delivered': 'Rice processing (CMR) · delivered', 'Godown utilisation': 'Stocks available · capacity utilised', 'Stage-I moved': 'Transportation · Stage-I plan achieved', 'Stage-II to FPS': 'Distribution (FPS) · allotment delivered' })[k.label] || k.label) + '</span></div>' +
       '<div class="tv ' + t + '">' + esc(k.value) + '</div>' +
       '<div class="ts">' + esc(k.sub) + '</div>' +
       '<div class="tf">' + (w !== null ? '<span class="bar"><i class="' + t + '" style="width:' + w + '%"></i></span>' : '<span class="bar none"></span>') + status(t) + '</div>' +

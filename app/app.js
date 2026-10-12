@@ -7,18 +7,18 @@ window.App = (function () {
   S.fold = function (key, open) { S.folds[key] = open; try { localStorage.setItem('ccc.folds', JSON.stringify(S.folds)); } catch (e) {} };
   const SECTIONS = [
     { k: 'overview', label: 'Executive Overview', icon: 'home' },
-    { k: 'chain', label: 'Value Chain', icon: 'chain' },
+    { k: 'chain', label: 'Value Chain Performance', icon: 'chain' },
     { k: 'districts', label: 'District Intelligence', icon: 'map' },
     { k: 'finance', label: 'Financial Intelligence', icon: 'rupee' },
     { k: 'prep', label: 'Preparedness', icon: 'check' },
     { k: 'incidents', label: 'Incidents & Monitoring', icon: 'alert' },
-    { k: 'voice', label: 'Service & Public Voice', icon: 'voice' },
-    { k: 'intel', label: 'Intelligence & Decisions', icon: 'brain' }
+    { k: 'voice', label: 'Service & Compliance', icon: 'voice' },
+    { k: 'intel', label: 'Decisions & Interventions', icon: 'brain' }
   ];
   const SUBS = {
     incidents: [['', 'Incidents'], ['cctv', 'CCTV records'], ['gps', 'GPS tracking'], ['image', 'Image analyser']],
     voice: [['', 'Grievances & service'], ['press', 'Press Watch'], ['youtube', 'YouTube watch']],
-    intel: [['', 'Ask & act'], ['log', 'Decision log'], ['inbox', 'Inbox']],
+    intel: [['', 'Insights & actions'], ['log', 'Decision log'], ['inbox', 'Inbox']],
     prep: [['', 'Executive overview'], ['compare', 'District ranking'], ['ranking', 'By parameter'], ['param', 'Parameter detail'], ['reports', 'Reports']]
   };
   const MOD_OF_SUB = { incidents: { '': 'alerts', cctv: 'cctv', gps: 'gps', image: 'img' }, voice: { '': 'alerts', press: 'news', youtube: 'yt' } };

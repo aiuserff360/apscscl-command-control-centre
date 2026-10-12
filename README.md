@@ -36,3 +36,11 @@ The baseline exposed everything as modules × stages. Here the stage spine (01 P
 ## Known POC notes (inherited from the baseline)
 
 Press clippings and YouTube comments are sample data; the decision log, inbox read-state and season selection live in the browser's local storage; CMR agency split, KPI 14a/14b/38 and the "Proposed" KPIs are marked as needing a source before go-live.
+
+## Version 1 language alignment
+
+The presentation follows the reference storyline: Executive Overview → Value Chain Performance → District Intelligence → District Deep Dive, with Financial Intelligence, Service & Compliance and Decisions & Interventions as supporting views. Preparedness and Incidents & Monitoring remain available as operational views. Route URLs and the five operational stage identifiers are preserved.
+
+Labels follow the meaning of the available data: registered ration cards are not households served; Stage-I movement is progress against plan, not on-time delivery; storage utilisation is occupancy, not days of cover; farmer payment flow is not government fund release. District map headings describe the selected measure. District-wide status and the supply-chain score summarise nine operational measures, while widespread exceptions do not establish a critical service disruption. Missing decisions display “No action recorded”; rankings display as performance highlights when no time series is available.
+
+Reference wording is used where supported without inventing reference-image figures, trends, scheme allocations or service outcomes. The underlying data, formulas, thresholds and drill-down paths remain unchanged.
