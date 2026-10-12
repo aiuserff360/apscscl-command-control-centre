@@ -125,7 +125,7 @@ window.UI = (function () {
   /* ---- bar list (ranked) ---- */
   const bars = function (list, opts) {
     opts = opts || {};
-    return '<div class="bars ' + (opts.cls || '') + '">' + (list || []).map(function (b) { const t = b.c === '#D8714F' ? 'bad' : b.c === '#E0AE4F' ? 'warn' : b.c === '#5B8FD0' ? 'good' : ''; return '<div class="brow"' + (b.go ? on(b.go) : '') + '><span class="bl">' + esc(b.label) + '</span><span class="bb"><i class="' + t + '" style="width:' + Math.max(2, Math.min(100, b.w || 0)) + '%"></i></span><span class="bv">' + esc(b.v) + '</span></div>'; }).join('') + '</div>';
+    return '<div class="bars ' + (opts.cls || '') + '">' + (list || []).map(function (b) { const t = b.c === '#D8714F' ? 'bad' : b.c === '#E0AE4F' ? 'warn' : b.c === '#5B8FD0' ? 'good' : ''; const cc = !t && b.c && /^(var\(|#)/.test(b.c) ? ';background:' + esc(b.c) : ''; return '<div class="brow"' + (b.go ? on(b.go) : '') + '><span class="bl">' + esc(b.label) + '</span><span class="bb"><i class="' + t + '" style="width:' + Math.max(2, Math.min(100, b.w || 0)) + '%' + cc + '"></i></span><span class="bv">' + esc(b.v) + '</span></div>'; }).join('') + '</div>';
   };
 
   /* ---- value-chain strip (the stage spine, physical order) ---- */

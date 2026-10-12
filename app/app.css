@@ -5,7 +5,15 @@
   --bg: #f3f6f2; --card: #ffffff; --line: #dde5dc; --line-2: #eef2ec;
   --ink: #17201a; --ink-2: #3d4a40; --ink-3: #6b776e; --muted: #8a948c;
   --good: #2e7d32; --warn: #b7791f; --bad: #b42318; --good-bg: #e8f3e9; --warn-bg: #fbf1dc; --bad-bg: #fbe7e5; --none-bg: #edf0ee;
-  --st-proc: #1f5e23; --st-cmr: #1f5e23; --st-s1: #1f5e23; --st-s2: #1f5e23; --st-stor: #1f5e23; --st-fps: #1f5e23;
+  /* Stage identity tokens: a stage keeps its colour everywhere (icons, cards, bars, charts, legends, navigation). */
+  --st-proc: #2b9f40; --st-proc-pale: #e1f3df;   /* Procurement · green */
+  --st-cmr: #2992d8; --st-cmr-pale: #e2efff;     /* Processing / CMR · blue */
+  --st-stor: #8657b9; --st-stor-pale: #eee3fa;   /* Storage · purple */
+  --st-s1: #e9a02c; --st-s1-pale: #fff0cf;       /* Transportation · amber */
+  --st-s2: #14969c; --st-s2-pale: #def2f2;       /* Distribution / FPS · teal */
+  --st-fps: #43a544; --st-fps-pale: #e6f4dc;     /* Beneficiary service · distinct green */
+  /* Operational status tokens: separate from stage identity. */
+  --ok: #209b4d; --ok-bg: #e4f4e9; --watch: #e9aa20; --watch-bg: #fff2d1; --attn: #e84040; --attn-bg: #fde4e4; --nodata: #9aa8ad; --nodata-bg: #eceff1;
   --nav-w: 240px; --rail-w: 300px; --r: 12px; --r-sm: 8px; --gap: 16px; --pad: 20px;
   --shadow: 0 1px 2px rgba(20, 40, 25, .04);
   --font: "Inter", "Segoe UI", system-ui, -apple-system, Arial, sans-serif;

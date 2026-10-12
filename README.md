@@ -14,13 +14,15 @@ app/engine.js       stub base class + headless host for the baseline view-model
 app/ui.js           components (tiles, KPI table, data table, flow strip, stepper, map, charts, drawers)
 app/pages.js        one renderer per section of the new information architecture
 app/app.js          navigation, hash routing, event delegation, drawers (KPI / record / Act / Ask)
-app/app.css         design tokens and styles (green-and-gold government look)
+app/app.css         design tokens (stage identity and operational status colours) and base styles
+app/reference.js    reference-led presentation layer for the five primary screens (Overview, Value Chain, District Intelligence, District Deep Dive, Financial Intelligence) plus Stock & Movement and the Dashboard guide; falls back to the layered views when a season filter is active
+app/reference.css   theme for the reference layer: dark-green navigation, light backgrounds, blue headings, compact cards
 data/baseline.js    data constants and model functions extracted verbatim from the client's demo
 data/component.js   the client's view-model builder class, unchanged
 data/masters.js     rice mill / RSK / MLS / godown masters (from the client's xls)
 data/adb.js         anomaly rule catalogue, anomalies, audit findings
 data/imgdb.js       vehicle image grades per RSK, two seasons
-assets/             the four reference photos (Good / Average / Bad / Unidentifiable)
+assets/             vehicle-image reference photos (Good / Average / Bad / Unidentifiable), six stage photos and the navigation landscape (standalone crops of the design reference); the banner emblem, landmark art and government mark are code-native SVG
 ```
 
 ## Navigation
@@ -44,3 +46,25 @@ The presentation follows the reference storyline: Executive Overview → Value C
 Labels follow the meaning of the available data: registered ration cards are not households served; Stage-I movement is progress against plan, not on-time delivery; storage utilisation is occupancy, not days of cover; farmer payment flow is not government fund release. District map headings describe the selected measure. District-wide status and the supply-chain score summarise nine operational measures, while widespread exceptions do not establish a critical service disruption. Missing decisions display “No action recorded”; rankings display as performance highlights when no time series is available.
 
 Reference wording is used where supported without inventing reference-image figures, trends, scheme allocations or service outcomes. The underlying data, formulas, thresholds and drill-down paths remain unchanged.
+
+## Colour system
+
+Two independent systems, both defined once in `app/app.css` and consumed everywhere (icons, cards, bars, charts, maps, legends, navigation):
+
+| Stage identity | Token | Colour |
+|---|---|---|
+| Procurement | `--st-proc` | green |
+| Processing / CMR | `--st-cmr` | blue |
+| Storage | `--st-stor` | purple |
+| Transportation (Stage-I) | `--st-s1` | amber |
+| Distribution / FPS (Stage-II) | `--st-s2` | teal |
+| Beneficiary service | `--st-fps` | distinct green |
+
+| Operational status | Token | Colour |
+|---|---|---|
+| On track | `--ok` | green |
+| Needs monitoring | `--watch` | amber |
+| Requires attention | `--attn` | red |
+| Missing data | `--nodata` | neutral grey |
+
+Status is always accompanied by a text label or legend; colour never carries meaning on its own.
