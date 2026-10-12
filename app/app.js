@@ -9,6 +9,7 @@ window.App = (function () {
     { k: 'overview', label: 'Executive Overview', icon: 'home' },
     { k: 'chain', label: 'Value Chain Performance', icon: 'chain' },
     { k: 'districts', label: 'District Intelligence', icon: 'map' },
+    { k: 'stock', label: 'Stock & Movement', icon: 'warehouse' },
     { k: 'finance', label: 'Financial Intelligence', icon: 'rupee' },
     { k: 'prep', label: 'Preparedness', icon: 'check' },
     { k: 'incidents', label: 'Incidents & Monitoring', icon: 'alert' },
@@ -34,6 +35,8 @@ window.App = (function () {
       case 'overview': st.module = 'overview'; st.stage = 'all'; st.path = basePath(); break;
       case 'chain': st.module = 'overview'; st.stage = S.stage; st.path = basePath(); if (S.sub === 'entities' && S.stage === 'all') S.sub = ''; break;
       case 'districts': st.module = 'overview'; st.stage = S.stage; st.path = s.path && s.path.length ? s.path : basePath(); break;
+      case 'stock': st.module = 'overview'; st.stage = 'all'; st.path = keep; break;
+      case 'guide': st.module = 'overview'; st.stage = 'all'; st.path = basePath(); break;
       case 'finance': st.module = 'fin'; st.stage = S.stage; st.path = keep; break;
       case 'prep': st.module = 'prep'; st.stage = 'all'; st.prepView = S.sub || 'overview'; st.path = keep; break;
       case 'incidents': st.module = MOD_OF_SUB.incidents[S.sub] || 'alerts'; st.stage = S.stage; st.path = keep; break;
@@ -73,16 +76,17 @@ window.App = (function () {
   };
   const setStage = function (k) { S.stage = k; if (S.section === 'chain' && S.sub === 'entities') S.sub = ''; applyNav(); E.invalidate(); };
   const setSub = function (sub) { S.sub = sub; applyNav(); E.invalidate(); };
+  const openLens = function (section) { const dn = (E.L.state.path || [])[0]; S.section = section; S.stage = 'all'; S.sub = ''; S.scrollTop = true; S.push = true; E.set({ path: dn ? [dn] : basePath() }); applyNav(); E.invalidate(); };
   const openDistrict = function (name) { S.section = 'districts'; S.stage = 'all'; S.sub = ''; S.scrollTop = true; E.set({ path: [name] }); applyNav(); E.invalidate(); };
 
   /* ---------- hash routing ---------- */
   const hashFor = function () {
-    const s = E.L.state; const p = s.path || []; const d = s.role === 'dm' ? p[1] : p[0];
+    const s = E.L.state; const p = s.path || []; const d = p[0];
     const q = d && S.section !== 'districts' && s.role !== 'dm' ? '?d=' + encodeURIComponent(d) : '';
     switch (S.section) {
       case 'overview': return '#/overview' + q;
       case 'chain': return '#/chain/' + S.stage + (S.sub ? '/' + S.sub : '') + q;
-      case 'districts': return '#/districts' + (d ? '/' + encodeURIComponent(d) + (S.stage !== 'all' ? '/' + S.stage + (S.sub ? '/' + S.sub : '') : '') : '');
+      case 'districts': return '#/districts' + (d ? '/' + encodeURIComponent(d) + (S.stage !== 'all' ? '/' + S.stage + (S.sub ? '/' + S.sub : '') : '') : '') + (p.length > 1 ? '?at=' + encodeURIComponent(JSON.stringify(p.slice(1))) : '');
       case 'finance': return '#/finance' + (S.stage !== 'all' ? '/' + S.stage : '') + q;
       case 'reports': return '#/reports' + q;
       default: return '#/' + S.section + (S.sub ? '/' + S.sub : '') + q;
@@ -93,10 +97,10 @@ window.App = (function () {
     const qd = (qs.match(/(?:^|&)d=([^&]*)/) || [])[1]; const parts = h.split('/').map(decodeURIComponent);
     if (qd && E.L.state.role !== 'dm') E.set({ path: [decodeURIComponent(qd)] }); else if (parts[0] !== 'districts') E.set({ path: basePath() });
     const sec = parts[0] || 'overview'; S.sub = ''; S.stage = 'all';
-    if (!SECTIONS.some(function (x) { return x.k === sec; }) && sec !== 'reports') { S.section = 'overview'; }
+    if (!SECTIONS.some(function (x) { return x.k === sec; }) && sec !== 'reports' && sec !== 'guide') { S.section = 'overview'; }
     else S.section = sec;
     if (sec === 'chain') { S.stage = SM[parts[1]] ? parts[1] : 'all'; S.sub = parts[2] || ''; }
-    else if (sec === 'districts') { if (parts[1]) { E.set({ path: (E.L.state.role === 'dm' ? [E.L.state.dm] : []).concat([parts[1]]) }); S.stage = SM[parts[2]] ? parts[2] : 'all'; S.sub = parts[3] || ''; } else E.set({ path: basePath() }); }
+    else if (sec === 'districts') { if (parts[1]) { let tail = []; try { const a = new URLSearchParams(qs).get('at'); if (a) { const parsed = JSON.parse(a); if (Array.isArray(parsed) && parsed.every(x => typeof x === 'string')) tail = parsed.slice(0, 3); } } catch (e) {} E.set({ path: [E.L.state.role === 'dm' ? E.L.state.dm : parts[1]].concat(tail) }); S.stage = SM[parts[2]] ? parts[2] : 'all'; S.sub = parts[3] || ''; } else E.set({ path: basePath() }); }
     else if (sec === 'finance') { S.stage = SM[parts[1]] ? parts[1] : 'all'; }
     else if (sec === 'reports') { E.set({ pivot: true }); return; }
     else { S.sub = parts[1] || ''; }
@@ -109,19 +113,19 @@ window.App = (function () {
   const banner = function (vm) {
     const s = E.L.state;
     return '<header class="banner"><div class="brand"><div class="emblem">' + icon('sheaf') + '</div><div><h1>APSCSCL</h1><div class="bl">Andhra Pradesh State Civil Supplies Corporation Limited</div><div class="bl2">Government of Andhra Pradesh</div></div></div>' +
-      '<div class="tagline">Command Control Centre<small>Food Security for a Prosperous Andhra Pradesh</small></div>' +
+      '<div class="tagline" role="img" aria-label="Andhra Pradesh landmarks · Food security for a prosperous Andhra Pradesh"></div><div class="government-brand" role="img" aria-label="Government of Andhra Pradesh · People First, Service Always"></div>' +
       '<div class="bright">' + U.btn('Ask', vm.chatOpen ? vm.closeChat : vm.openChat, 'sm gold', 'ask') + U.btn('Reports', vm.togglePivot, 'sm ghost', 'grid') +
-      '<div class="role"><span class="av">' + (s.role === 'dm' ? 'DM' : 'C') + '</span><div><select' + on(vm.onRole, 'change') + '>' + vm.roleBtns.filter(function (b) { return b.label !== 'Head office'; }).map(function (b) { return '<option value="' + esc(b.label === 'Commissioner' ? 'comm' : 'dm') + '"' + (b.on ? ' selected' : '') + '>' + esc(b.label) + '</option>'; }).join('') + '</select>' + (vm.isDM ? '<div class="sub"><select' + on(vm.onDm, 'change') + '>' + vm.distF.opts.map(function (d) { return '<option' + (d.name === vm.dm ? ' selected' : '') + '>' + esc(d.name) + '</option>'; }).join('') + '</select></div>' : '<div class="sub">Head office</div>') + '</div></div></div></header>';
+      '<div class="role"><span class="av">' + (s.role === 'dm' ? 'DM' : 'C') + '</span><div><select' + on(vm.onRole, 'change') + '>' + vm.roleBtns.filter(function (b) { return b.label !== 'Head office'; }).map(function (b) { return '<option value="' + esc(b.label === 'Commissioner' ? 'comm' : 'dm') + '"' + (b.on ? ' selected' : '') + '>' + esc(b.label) + '</option>'; }).join('') + '</select>' + (vm.isDM ? '<div class="sub"><select' + on(vm.onDm, 'change') + '>' + vm.distF.opts.map(function (d) { return '<option' + (d.name === vm.dm ? ' selected' : '') + '>' + esc(d.name) + '</option>'; }).join('') + '</select></div>' : '<div class="sub">APSCSCL</div>') + '</div></div></div></header>';
   };
   const nav = function (vm) {
     const s = E.L.state; const inboxN = vm.isDM ? (vm.leftItems.filter(function (x) { return x.sk === 'inbox'; })[0] || {}).num : '';
-    return '<nav class="nav"><div class="nl">Navigation</div>' + SECTIONS.map(function (x) {
+    return '<nav class="nav"><div class="nl">Command Control Centre</div>' + SECTIONS.map(function (x) {
       const onCls = S.section === x.k ? ' on' : '';
       let subs = '';
       if (S.section === x.k && SUBS[x.k]) subs = '<div class="sub">' + SUBS[x.k].filter(function (t) { return !(x.k === 'intel' && t[0] === 'inbox' && !vm.isDM); }).map(function (t) { return '<button class="' + (S.sub === t[0] ? 'on' : '') + '"' + on(function () { go(x.k, 'all', t[0]); }) + '>' + esc(t[1]) + (t[0] === 'inbox' && inboxN ? ' <span class="cnt">' + esc(inboxN) + '</span>' : '') + '</button>'; }).join('') + '</div>';
       if (S.section === x.k && x.k === 'chain') subs = '<div class="sub">' + [['all', 'All stages']].concat(P.STAGE_KEYS.map(function (k) { return [k, SM[k].num + ' · ' + SM[k].label]; })).map(function (t) { return '<button class="' + (S.stage === t[0] ? 'on' : '') + '"' + on(function () { go('chain', t[0]); }) + '>' + esc(t[1]) + '</button>'; }).join('') + '</div>';
       return '<button class="ni' + onCls + '"' + on(function () { go(x.k, x.k === 'chain' ? S.stage : 'all'); }) + '>' + icon(x.icon) + '<span>' + esc(x.label) + '</span>' + (x.k === 'intel' && inboxN ? '<span class="cnt">' + esc(inboxN) + '</span>' : '') + '</button>' + subs;
-    }).join('') + '<div class="foot"><b>Annadhanam · Aarogyam · Samruddhi</b><span class="tel">అన్నదానం · ఆరోగ్యం · సమృద్ధి</span></div></nav>';
+    }).join('') + '<div class="nav-utility">' + U.btn('Dashboard guide', function () { go('guide'); }, 'xs ghost', 'chain') + U.btn('Reports & pivot', vm.togglePivot, 'xs ghost', 'grid') + '</div><div class="foot"><b>Annadhanam<br>Aarogyam<br>Samruddhi<br>Andhra Pradesh</b></div></nav>';
   };
   const filterbar = function (vm) {
     const seas = vm.seas;
@@ -156,6 +160,8 @@ window.App = (function () {
       case 'overview': return P.overview(vm);
       case 'chain': return S.stage === 'all' ? P.chainAll(vm) : P.stage(vm, S.stage, S.sub);
       case 'districts': return depth >= 1 || (s.role === 'dm' && p.length) ? P.district(vm, S.stage) : P.districts(vm);
+      case 'stock': return P.stock(vm);
+      case 'guide': return P.guide(vm);
       case 'finance': return P.finance(vm);
       case 'prep': return P.prep(vm);
       case 'incidents': return S.sub ? P.feedPage(vm, S.sub) : P.incidents(vm);
@@ -236,7 +242,7 @@ window.App = (function () {
     const sb = vm.sBanner.on ? '<div class="sbanner"><b>' + esc(vm.sBanner.title) + '</b><span>' + esc(vm.sBanner.desc) + '</span>' + U.btn('Show all seasons', vm.sBanner.clear, 'xs ghost') + '</div>' : '';
     const sEmpty = vm.sEmpty.on ? '<div class="card" style="margin-bottom:12px"><h3>' + esc(vm.sEmpty.title) + '</h3><p class="small">' + esc(vm.sEmpty.text) + '</p>' + (vm.sEmpty.hasAlt ? U.btn(vm.sEmpty.altLabel, vm.sEmpty.alt, 'sm') : '') + '</div>' : '';
     const main = filterbar(vm) + crumbs(vm) + head + sb + sEmpty + (railHtml ? '<div class="withrail"><div class="stack">' + pg.body + '</div><aside class="rail">' + railHtml + '</aside></div>' : '<div class="stack">' + pg.body + '</div>');
-    const html = banner(vm) + '<div class="frame">' + nav(vm) + '<main class="main">' + main + '</main></div>' + kinfoDrawer(vm) + rxDrawer(vm) + actDrawer(vm) + chatDrawer(vm) + modal(vm);
+    const html = banner(vm) + '<div class="frame">' + nav(vm) + '<main class="main view-' + S.section + '">' + main + '</main></div>' + kinfoDrawer(vm) + rxDrawer(vm) + actDrawer(vm) + chatDrawer(vm) + modal(vm);
     const y = window.scrollY; const ae = document.activeElement; const fkey = ae && ae.dataset ? ae.dataset.fkey : null; let selPos = null; try { selPos = ae && ae.selectionStart; } catch (e) {}
     root.innerHTML = html;
     if (S.scrollTop) { window.scrollTo(0, 0); S.scrollTop = false; } else window.scrollTo(0, y);
@@ -254,12 +260,12 @@ window.App = (function () {
   root.addEventListener('change', function (e) { const el = e.target.closest('[data-change]'); if (!el) return; E.call(el.dataset.change, e); E.invalidate(); });
   root.addEventListener('input', function (e) { const el = e.target.closest('[data-input]'); if (!el) return; E.call(el.dataset.input, e); E.invalidate(); });
   root.addEventListener('submit', function (e) { const el = e.target.closest('[data-submit]'); if (!el) return; e.preventDefault(); E.call(el.dataset.submit, e); E.invalidate(); });
-  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { const vm = E.vm; if (!vm) return; if (vm.act.has) vm.act.close(); else if (vm.hasRx) vm.closeRx(); else if (vm.kinfo.has) vm.kinfo.close(); else if (vm.chatOpen) vm.closeChat(); else if (vm.hasModal) vm.closeModal(); E.invalidate(); } });
+  document.addEventListener('keydown', function (e) { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[role="button"][data-on]')) { e.preventDefault(); E.call(e.target.dataset.on, e); E.invalidate(); return; } if (e.key === 'Escape') { const vm = E.vm; if (!vm) return; if (vm.act.has) vm.act.close(); else if (vm.hasRx) vm.closeRx(); else if (vm.kinfo.has) vm.kinfo.close(); else if (vm.chatOpen) vm.closeChat(); else if (vm.hasModal) vm.closeModal(); E.invalidate(); } });
   window.addEventListener('hashchange', function () { if (S.hashing) return; readHash(); E.invalidate(); });
 
   /* ---------- boot ---------- */
   E.onChange(render);
   E.boot();
   readHash(); E.invalidate();
-  return { S: S, go: go, setStage: setStage, setSub: setSub, openDistrict: openDistrict, render: render };
+  return { S: S, go: go, setStage: setStage, setSub: setSub, openDistrict: openDistrict, openLens: openLens, render: render };
 })();
