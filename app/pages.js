@@ -128,11 +128,11 @@ window.Pages = (function () {
       const sp = E.peek({ module: 'overview', stage: k, pivot: false, kpiOpen: null });
       if (!sp) return '';
       const m = SM[k];
-      return '<div class="card stagecard" style="--sc:' + m.color + '"><div class="sch"><span class="snum">' + m.num + '</span><h3>' + esc(m.label) + '<span class="scs">' + esc(sp.page.title) + '</span></h3></div><div class="ks">' + sp.page.kpis.slice(0, 4).map(function (kk) { return '<div class="k"' + on(function () { A().go('chain', k); }) + '><div class="l">' + esc(kk.label) + '</div><div class="v ' + U.toneOf(kk.vcls) + '">' + esc(kk.value) + '</div><div class="s">' + esc(kk.sub) + '</div></div>'; }).join('') + '</div><div style="margin-top:8px;display:flex;justify-content:space-between;align-items:center"><span class="note" style="margin:0">' + esc(sp.page.sub.replace(/^Source: /, '')) + '</span>' + U.link('Open →', function () { A().go('chain', k); }) + '</div></div>';
+      return '<div class="card stagecard" style="--sc:' + m.color + '"><div class="sch"><span class="snum">' + m.num + '</span><h3>' + esc(m.label) + '<span class="scs">' + esc(sp.page.title) + '</span></h3></div><div class="ks">' + sp.page.kpis.slice(0, 4).map(function (kk) { return '<div class="k"' + on(function () { A().go('chain', k); }) + '><div class="l">' + esc(kk.label) + '</div><div class="v ' + U.toneOf(kk.vcls) + '">' + esc(kk.value) + '</div><div class="s">' + esc(kk.sub) + '</div></div>'; }).join('') + '</div><div style="margin-top:8px;display:flex;justify-content:space-between;align-items:flex-start;gap:8px"><span class="note" style="margin:0;min-width:0">' + esc(sp.page.sub.replace(/^Source: /, '')) + '</span><span style="flex:none">' + U.link('Open →', function () { A().go('chain', k); }) + '</span></div></div>';
     }).join('');
     const body = U.stepper('all', function (k) { A().go('chain', k); }) +
       card(sh('Paddy-to-beneficiary flow', 'Physical order of the chain') + U.flowStrip(p.flow)) +
-      '<div class="grid" style="margin-top:12px"><div class="c12"><div class="grid" style="grid-template-columns:repeat(5,minmax(0,1fr))">' + cards + '</div></div>' +
+      '<div class="grid" style="margin-top:12px"><div class="c12"><div class="stagegrid">' + cards + '</div></div>' +
       '<div class="c6">' + card(sh('Pending quantity by stage', p.ov.asOf) + pendBlock(p.ov)) + '</div>' +
       '<div class="c6">' + card(sh(p.ov.attnTitle, 'Below threshold on 4 or more of 9 measures') + attnBlock(p.ov) + '<div class="small" style="font-weight:700;margin:10px 0 4px">Weakest by stage</div>' + weakBlock(p.ov)) + '</div>' +
       '</div>' + foldGroup([fold('vc.matrix', p.ov.mxTitle, p.ov.mxSub, matrixBlock(p.ov))]);
@@ -150,9 +150,8 @@ window.Pages = (function () {
       body = extras(p) + (p.hasTable ? U.dataTable(p.table, { title: p.table.title, sub: p.table.note }) : '') + (p.hasT2 ? U.dataTable(p.t2, { max: 60 }) : '') + rxBlock(p.rx);
     } else if (!sub) {
       body = (p.showFlow ? card(sh('Position in the chain', '') + U.flowStrip(p.flow)) : '') +
-        '<div style="margin:12px 0">' + U.tiles(p.kpis, { cls: p.kpis.length > 4 ? 'six' : 'four' }) + '</div>' +
-        '<div class="grid"><div class="c8">' + scoresBlock(p.scores) + '</div><div class="c4 stack">' + chartCard(p) + extras(p) + '</div>' +
-        '</div>' + foldGroup([(p.hasT2 ? fold('st.t2.' + k, p.t2.title, p.t2.note, U.dataTable(p.t2, { bare: true, max: 40 })) : ''), (inDistrict && p.hasTable ? fold('st.tbl.' + k, p.table.title, p.table.note, U.dataTable(p.table, { bare: true }), { open: true }) : '')]);
+        '<div class="grid" style="margin:12px 0"><div class="c8">' + U.tiles(p.kpis, { cls: p.kpis.length > 4 ? 'three' : 'two' }) + '</div><div class="c4 stack">' + chartCard(p) + extras(p) + '</div></div>' +
+        scoresBlock(p.scores) + foldGroup([(p.hasT2 ? fold('st.t2.' + k, p.t2.title, p.t2.note, U.dataTable(p.t2, { bare: true, max: 40 })) : ''), (inDistrict && p.hasTable ? fold('st.tbl.' + k, p.table.title, p.table.note, U.dataTable(p.table, { bare: true }), { open: true }) : '')]);
     } else if (sub === 'districts') {
       body = '<div class="grid"><div class="c8">' + U.dataTable(p.table, { title: p.table.title }) + '</div><div class="c4">' + chartCard(p) + '</div></div>';
     } else if (sub === 'entities') {
